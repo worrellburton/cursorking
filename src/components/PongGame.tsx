@@ -41,6 +41,8 @@ export default function PongGame({ playerName }: { playerName: string }) {
   const lastSentRef = useRef(0);
   const mouseRef = useRef({ x: 0, y: 0 });
   const ballTrailRef = useRef<BallTrail[]>([]);
+  const prevBallRef = useRef({ x: 0.5, y: 0.5 });
+  const ballSpeedRef = useRef(0);
   const canvasSizeRef = useRef({ w: 800, h: 500 });
   const playerCountRef = useRef(playerCount);
   gameStateRef.current = gameState;
@@ -229,6 +231,17 @@ export default function PongGame({ playerName }: { playerName: string }) {
         ctx.restore();
       }
 
+      // Compute ball speed for glow scaling
+      const prev = prevBallRef.current;
+      const dx = ballX - prev.x;
+      const dy = ballY - prev.y;
+      const frameSpeed = Math.sqrt(dx * dx + dy * dy);
+      ballSpeedRef.current = ballSpeedRef.current * 0.9 + frameSpeed * 0.1;
+      prevBallRef.current = { x: ballX, y: ballY };
+
+      // Speed multiplier: 1.0 at rest, up to ~3.0 at high speed
+      const speedFactor = Math.min(3, 1 + ballSpeedRef.current / 8);
+
       // Ball trail
       const trail = ballTrailRef.current;
       trail.push({ x: ballX, y: ballY, age: 0 });
@@ -241,32 +254,34 @@ export default function PongGame({ playerName }: { playerName: string }) {
         if (life <= 0) continue;
 
         const r = ballR * life * 0.8;
-        const grad = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, r * 3);
-        grad.addColorStop(0, `rgba(255, 200, 50, ${life * 0.6})`);
-        grad.addColorStop(0.3, `rgba(255, 100, 20, ${life * 0.4})`);
-        grad.addColorStop(0.7, `rgba(200, 30, 0, ${life * 0.15})`);
+        const trailGlowR = r * (2.5 + speedFactor);
+        const grad = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, trailGlowR);
+        grad.addColorStop(0, `rgba(255, 200, 50, ${life * 0.4 * speedFactor})`);
+        grad.addColorStop(0.3, `rgba(255, 100, 20, ${life * 0.3 * speedFactor})`);
+        grad.addColorStop(0.7, `rgba(200, 30, 0, ${life * 0.1 * speedFactor})`);
         grad.addColorStop(1, "rgba(100, 0, 0, 0)");
         ctx.fillStyle = grad;
         ctx.beginPath();
-        ctx.arc(t.x, t.y, r * 3, 0, Math.PI * 2);
+        ctx.arc(t.x, t.y, trailGlowR, 0, Math.PI * 2);
         ctx.fill();
       }
 
       // Ball
       ctx.save();
-      const ballGrad = ctx.createRadialGradient(ballX, ballY, 0, ballX, ballY, ballR * 3.5);
+      const ballGlowR = ballR * (3 + speedFactor * 1.5);
+      const ballGrad = ctx.createRadialGradient(ballX, ballY, 0, ballX, ballY, ballGlowR);
       ballGrad.addColorStop(0, "rgba(255, 255, 255, 1)");
-      ballGrad.addColorStop(0.15, "rgba(255, 240, 180, 0.9)");
-      ballGrad.addColorStop(0.3, "rgba(255, 160, 50, 0.5)");
-      ballGrad.addColorStop(0.6, "rgba(255, 60, 10, 0.2)");
+      ballGrad.addColorStop(0.15, `rgba(255, 240, 180, ${0.7 + speedFactor * 0.1})`);
+      ballGrad.addColorStop(0.3, `rgba(255, 160, 50, ${0.3 + speedFactor * 0.15})`);
+      ballGrad.addColorStop(0.6, `rgba(255, 60, 10, ${0.1 + speedFactor * 0.1})`);
       ballGrad.addColorStop(1, "rgba(200, 0, 0, 0)");
       ctx.fillStyle = ballGrad;
       ctx.beginPath();
-      ctx.arc(ballX, ballY, ballR * 3.5, 0, Math.PI * 2);
+      ctx.arc(ballX, ballY, ballGlowR, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.shadowColor = "#ffffff";
-      ctx.shadowBlur = 20;
+      ctx.shadowBlur = 15 + speedFactor * 10;
       ctx.fillStyle = "#ffffff";
       ctx.beginPath();
       ctx.arc(ballX, ballY, ballR, 0, Math.PI * 2);

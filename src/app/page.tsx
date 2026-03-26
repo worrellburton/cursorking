@@ -14,14 +14,14 @@ export default function Home() {
 
   const handleNameSubmit = () => {
     if (!playerName.trim()) return;
-    setScreen("start");
-  };
-
-  const handleStart = () => {
     const audio = new Audio(`${process.env.NODE_ENV === "production" ? "/cursorking" : ""}/menu.mp3`);
     audio.volume = 0.5;
     audio.play().catch(() => {});
     audioRef.current = audio;
+    setScreen("start");
+  };
+
+  const handleStart = () => {
     setScreen("game");
   };
 
@@ -101,7 +101,7 @@ export default function Home() {
               textTransform: "uppercase",
             }}
           >
-            Enter your name
+            PLAYER
           </label>
           <input
             type="text"
@@ -128,17 +128,6 @@ export default function Home() {
               caretColor: "#22d3ee",
             }}
           />
-          <p
-            style={{
-              fontFamily: "'Courier New', Courier, monospace",
-              fontSize: "0.7rem",
-              color: "rgba(255, 255, 255, 0.2)",
-              letterSpacing: "0.1em",
-              marginTop: "8px",
-            }}
-          >
-            PRESS ENTER TO CONTINUE
-          </p>
         </div>
       )}
 
@@ -147,18 +136,7 @@ export default function Home() {
           <div className="relative z-10 flex flex-col items-center gap-10 text-center px-4">
             {titleEl}
 
-            <p
-              style={{
-                fontFamily: "'Courier New', Courier, monospace",
-                fontSize: "1.1rem",
-                color: "rgba(255, 255, 255, 0.6)",
-                letterSpacing: "0.1em",
-              }}
-            >
-              Welcome, <span style={{ color: "#22d3ee" }}>{playerName.toUpperCase()}</span>
-            </p>
-
-            {pillButton("START", true, handleStart)}
+            {pillButton("ENTER THE ARENA", true, handleStart)}
           </div>
         </>
       )}
