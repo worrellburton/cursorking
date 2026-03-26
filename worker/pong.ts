@@ -4,18 +4,25 @@ const PADDLE_HEIGHT = 0.14;
 const PADDLE_WIDTH = 0.018;
 const BALL_SIZE = 0.009;
 const BALL_SPEED = 0.007;
-const BALL_ACCEL = 1.04;       // speed multiplier on each paddle hit
-const BALL_TICK_ACCEL = 1.0002; // continuous speed increase per tick (~60/sec)
+const BALL_ACCEL = 1.04;
+const BALL_TICK_ACCEL = 1.0002;
 const WIN_SCORE = 3;
 const RESTART_DELAY = 3000;
 
-// Left paddle X clamped to [0.02, 0.45], right to [0.55, 0.98]
 const LEFT_X_MIN = 0.02;
 const LEFT_X_MAX = 0.45;
 const RIGHT_X_MIN = 0.55;
 const RIGHT_X_MAX = 0.98;
 
+const BULLET_SPEED = 0.015;
+const BULLET_PICKUP_RADIUS = 0.03;
+const BULLET_HIT_RADIUS = 0.04;
+const SLOW_DURATION = 3000; // ms of slowdown
+const SLOW_FACTOR = 0.35;  // paddle speed multiplier when slowed
+const PICKUP_SPAWN_INTERVAL = 8000; // ms between pickup spawns
+
 type PaddleState = { x: number; y: number };
+type Bullet = { x: number; y: number; vx: number; owner: "left" | "right" };
 
 type GameState = {
   ball: { x: number; y: number; vx: number; vy: number };
@@ -33,6 +40,17 @@ export class PongRoom extends DurableObject {
   interval: ReturnType<typeof setInterval> | null = null;
   running = false;
   winner: string | null = null;
+
+  // Bullet system
+  bullets: Bullet[] = [];
+  ammo: { left: number; right: number } = { left: 0, right: 0 };
+  pickup: { x: number; y: number; active: boolean } = { x: 0.5, y: 0.92, active: false };
+  pickupTimer: ReturnType<typeof setTimeout> | null = null;
+  slowedUntil: { left: number; right: number } = { left: 0, right: 0 };
+  cursorPositions: { left: { x: number; y: number }; right: { x: number; y: number } } = {
+    left: { x: 0.04, y: 0.5 },
+    right: { x: 0.96, y: 0.5 },
+  };
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -89,11 +107,25 @@ export class PongRoom extends DurableObject {
     return "spectator";
   }
 
+  schedulePickup() {
+    if (this.pickupTimer) clearTimeout(this.pickupTimer);
+    this.pickupTimer = setTimeout(() => {
+      if (this.running && !this.winner) {
+        this.pickup = { x: 0.5, y: 0.92, active: true };
+        this.broadcastState();
+      }
+    }, PICKUP_SPAWN_INTERVAL);
+  }
+
   startGame() {
     if (this.running) return;
     this.winner = null;
     const fresh = this.freshState();
     this.state_ = { ...fresh, score: { left: 0, right: 0 } };
+    this.bullets = [];
+    this.ammo = { left: 0, right: 0 };
+    this.pickup = { x: 0.5, y: 0.92, active: false };
+    this.slowedUntil = { left: 0, right: 0 };
     this.broadcastState();
 
     this.broadcast(JSON.stringify({ type: "countdown", value: 3 }));
@@ -107,6 +139,7 @@ export class PongRoom extends DurableObject {
       this.broadcast(JSON.stringify({ type: "countdown", value: 0 }));
       this.running = true;
       this.interval = setInterval(() => this.tick(), 1000 / 60);
+      this.schedulePickup();
     }, 3000);
   }
 
@@ -116,12 +149,17 @@ export class PongRoom extends DurableObject {
       clearInterval(this.interval);
       this.interval = null;
     }
+    if (this.pickupTimer) {
+      clearTimeout(this.pickupTimer);
+      this.pickupTimer = null;
+    }
   }
 
   tick() {
     if (this.winner) return;
 
     const { ball, paddles } = this.state_;
+    const now = Date.now();
 
     // Continuous speed increase every tick
     ball.vx *= BALL_TICK_ACCEL;
@@ -140,7 +178,7 @@ export class PongRoom extends DurableObject {
       ball.vy = -Math.abs(ball.vy);
     }
 
-    // Left paddle collision (rectangle check)
+    // Left paddle collision
     const lp = paddles.left;
     const lpLeft = lp.x - PADDLE_WIDTH / 2;
     const lpRight = lp.x + PADDLE_WIDTH / 2;
@@ -184,6 +222,29 @@ export class PongRoom extends DurableObject {
       ball.vy = speed * Math.sin(angle);
     }
 
+    // Update bullets
+    for (let i = this.bullets.length - 1; i >= 0; i--) {
+      const b = this.bullets[i];
+      b.x += b.vx;
+
+      // Off screen
+      if (b.x < -0.05 || b.x > 1.05) {
+        this.bullets.splice(i, 1);
+        continue;
+      }
+
+      // Check hit against opponent cursor
+      const target: "left" | "right" = b.owner === "left" ? "right" : "left";
+      const cursor = this.cursorPositions[target];
+      const dx = b.x - cursor.x;
+      const dy = b.y - cursor.y;
+      if (Math.sqrt(dx * dx + dy * dy) < BULLET_HIT_RADIUS) {
+        this.slowedUntil[target] = now + SLOW_DURATION;
+        this.bullets.splice(i, 1);
+        this.broadcast(JSON.stringify({ type: "bullet-hit", target }));
+      }
+    }
+
     // Scoring
     if (ball.x < 0) {
       this.state_.score.right++;
@@ -213,6 +274,10 @@ export class PongRoom extends DurableObject {
     setTimeout(() => {
       this.winner = null;
       this.state_ = this.freshState();
+      this.bullets = [];
+      this.ammo = { left: 0, right: 0 };
+      this.pickup = { x: 0.5, y: 0.92, active: false };
+      this.slowedUntil = { left: 0, right: 0 };
       if (this.players.size === 2) {
         this.startGame();
       } else {
@@ -233,6 +298,7 @@ export class PongRoom extends DurableObject {
   }
 
   broadcastState() {
+    const now = Date.now();
     this.broadcast(
       JSON.stringify({
         type: "game-state",
@@ -245,6 +311,13 @@ export class PongRoom extends DurableObject {
             right: this.getNameForRole("right"),
           },
           winner: this.winner,
+          bullets: this.bullets.map(b => ({ x: b.x, y: b.y, owner: b.owner })),
+          ammo: this.ammo,
+          pickup: this.pickup,
+          slowed: {
+            left: this.slowedUntil.left > now,
+            right: this.slowedUntil.right > now,
+          },
         },
       })
     );
@@ -287,6 +360,13 @@ export class PongRoom extends DurableObject {
             right: this.getNameForRole("right"),
           },
           winner: this.winner,
+          bullets: this.bullets.map(b => ({ x: b.x, y: b.y, owner: b.owner })),
+          ammo: this.ammo,
+          pickup: this.pickup,
+          slowed: {
+            left: this.slowedUntil.left > Date.now(),
+            right: this.slowedUntil.right > Date.now(),
+          },
         },
       })
     );
@@ -321,23 +401,56 @@ export class PongRoom extends DurableObject {
     if (!role) return;
 
     if (data.type === "paddle-move") {
-      const y = Math.max(
-        PADDLE_HEIGHT / 2,
-        Math.min(1 - PADDLE_HEIGHT / 2, data.y)
-      );
+      const now = Date.now();
+      const isSlowed = this.slowedUntil[role] > now;
 
-      // Clamp X to player's half
-      let x: number;
+      let y = data.y;
+      let x = data.x;
+
+      // Apply slowdown: lerp toward current position instead of jumping
+      if (isSlowed) {
+        const current = this.state_.paddles[role];
+        x = current.x + (x - current.x) * SLOW_FACTOR;
+        y = current.y + (y - current.y) * SLOW_FACTOR;
+      }
+
+      y = Math.max(PADDLE_HEIGHT / 2, Math.min(1 - PADDLE_HEIGHT / 2, y));
+
       if (role === "left") {
-        x = Math.max(LEFT_X_MIN, Math.min(LEFT_X_MAX, data.x ?? 0.04));
+        x = Math.max(LEFT_X_MIN, Math.min(LEFT_X_MAX, x ?? 0.04));
       } else {
-        x = Math.max(RIGHT_X_MIN, Math.min(RIGHT_X_MAX, data.x ?? 0.96));
+        x = Math.max(RIGHT_X_MIN, Math.min(RIGHT_X_MAX, x ?? 0.96));
       }
 
       this.state_.paddles[role] = { x, y };
+      this.cursorPositions[role] = { x: data.x, y: data.y };
 
       if (!this.running) {
         this.broadcastState();
+      }
+    }
+
+    if (data.type === "grab-pickup") {
+      if (this.pickup.active) {
+        // Check if cursor is close enough to pickup
+        const cursor = this.cursorPositions[role];
+        const dx = cursor.x - this.pickup.x;
+        const dy = cursor.y - this.pickup.y;
+        if (Math.sqrt(dx * dx + dy * dy) < BULLET_PICKUP_RADIUS * 2) {
+          this.pickup.active = false;
+          this.ammo[role] += 3;
+          this.broadcastState();
+          this.schedulePickup();
+        }
+      }
+    }
+
+    if (data.type === "fire-bullet") {
+      if (this.ammo[role] > 0 && this.running) {
+        this.ammo[role]--;
+        const cursor = this.cursorPositions[role];
+        const vx = role === "left" ? BULLET_SPEED : -BULLET_SPEED;
+        this.bullets.push({ x: cursor.x, y: cursor.y, vx, owner: role });
       }
     }
   }

@@ -24,6 +24,10 @@ type GameState = {
   score: { left: number; right: number };
   names: { left: string; right: string };
   winner: string | null;
+  bullets: { x: number; y: number; owner: "left" | "right" }[];
+  ammo: { left: number; right: number };
+  pickup: { x: number; y: number; active: boolean };
+  slowed: { left: boolean; right: boolean };
 };
 
 type BallTrail = { x: number; y: number; age: number };
@@ -39,6 +43,10 @@ export default function PongGame({ playerName }: { playerName: string }) {
     score: { left: 0, right: 0 },
     names: { left: "", right: "" },
     winner: null,
+    bullets: [],
+    ammo: { left: 0, right: 0 },
+    pickup: { x: 0.5, y: 0.92, active: false },
+    slowed: { left: false, right: false },
   });
   const myRoleRef = useRef<"left" | "right" | "spectator">("spectator");
   const countdownRef = useRef<number | null>(null);
@@ -49,12 +57,13 @@ export default function PongGame({ playerName }: { playerName: string }) {
   const ballSpeedRef = useRef(0);
   const canvasSizeRef = useRef({ w: 800, h: 500 });
   const playerCountRef = useRef(0);
+  const bulletHitFlashRef = useRef(0); // timestamp of last hit flash
 
   // Ball interpolation refs
   const serverBallRef = useRef({ x: 0.5, y: 0.5 });
   const serverBallPrevRef = useRef({ x: 0.5, y: 0.5 });
   const serverBallTimeRef = useRef(0);
-  const serverBallDtRef = useRef(16.67); // estimated server tick interval in ms
+  const serverBallDtRef = useRef(16.67);
   const interpBallRef = useRef({ x: 0.5, y: 0.5 });
 
   // Only playerCount triggers React re-render (for the HUD text)
@@ -74,22 +83,21 @@ export default function PongGame({ playerName }: { playerName: string }) {
         if (msg.type === "game-state") {
           const state = msg.state as GameState;
 
-          // Ball interpolation: store previous and new server ball positions
+          // Ball interpolation
           const now = performance.now();
           const dt = now - serverBallTimeRef.current;
           if (dt > 0 && dt < 200) {
-            // Smooth the estimated tick interval
             serverBallDtRef.current = serverBallDtRef.current * 0.8 + dt * 0.2;
           }
           serverBallPrevRef.current = { ...serverBallRef.current };
           serverBallRef.current = { x: state.ball.x, y: state.ball.y };
           serverBallTimeRef.current = now;
 
-          // Client-side prediction: keep our own paddle position, use server for opponent
+          // Client-side prediction: keep our own paddle position
           const role = myRoleRef.current;
           if (role === "left" || role === "right") {
             const myPaddle = gameStateRef.current.paddles[role];
-            state.paddles[role] = myPaddle; // keep local prediction
+            state.paddles[role] = myPaddle;
           }
 
           gameStateRef.current = state;
@@ -103,6 +111,12 @@ export default function PongGame({ playerName }: { playerName: string }) {
         }
         if (msg.type === "countdown") {
           countdownRef.current = msg.value > 0 ? msg.value : null;
+        }
+        if (msg.type === "bullet-hit") {
+          const role = myRoleRef.current;
+          if (msg.target === role) {
+            bulletHitFlashRef.current = Date.now();
+          }
         }
       };
 
@@ -149,10 +163,40 @@ export default function PongGame({ playerName }: { playerName: string }) {
     wsRef.current?.send(JSON.stringify({ type: "paddle-move", x: normalizedX, y: normalizedY }));
   }, []);
 
+  // Click handler: grab pickup or fire bullet
+  const handleClick = useCallback(() => {
+    const role = myRoleRef.current;
+    if (role === "spectator") return;
+    const state = gameStateRef.current;
+
+    // Check if clicking near pickup
+    if (state.pickup.active) {
+      const { w, h } = canvasSizeRef.current;
+      const mouse = mouseRef.current;
+      const mx = mouse.x / w;
+      const my = mouse.y / h;
+      const dx = mx - state.pickup.x;
+      const dy = my - state.pickup.y;
+      if (Math.sqrt(dx * dx + dy * dy) < 0.06) {
+        wsRef.current?.send(JSON.stringify({ type: "grab-pickup" }));
+        return;
+      }
+    }
+
+    // Otherwise fire bullet if we have ammo
+    if (state.ammo[role] > 0) {
+      wsRef.current?.send(JSON.stringify({ type: "fire-bullet" }));
+    }
+  }, []);
+
   useEffect(() => {
     window.addEventListener("pointermove", handlePointerMove);
-    return () => window.removeEventListener("pointermove", handlePointerMove);
-  }, [handlePointerMove]);
+    window.addEventListener("click", handleClick);
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("click", handleClick);
+    };
+  }, [handlePointerMove, handleClick]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -181,7 +225,7 @@ export default function PongGame({ playerName }: { playerName: string }) {
       const W = canvas.width;
       const H = canvas.height;
 
-      // Interpolate ball position between server ticks for ultra-smooth movement
+      // Interpolate ball
       const now = performance.now();
       const elapsed = now - serverBallTimeRef.current;
       const t = Math.min(1, elapsed / serverBallDtRef.current);
@@ -192,7 +236,6 @@ export default function PongGame({ playerName }: { playerName: string }) {
         y: prevB.y + (nextB.y - prevB.y) * t,
       };
 
-      // Use interpolated ball if game is running, otherwise use server position directly
       const activeBall = state.winner ? state.ball : interpBallRef.current;
       const ballX = activeBall.x * W;
       const ballY = activeBall.y * H;
@@ -206,6 +249,16 @@ export default function PongGame({ playerName }: { playerName: string }) {
       const ballR = BALL_SIZE * Math.min(W / 800, H / 500);
 
       ctx.clearRect(0, 0, W, H);
+
+      // Slowed screen flash
+      const hitAge = Date.now() - bulletHitFlashRef.current;
+      if (hitAge < 500) {
+        const flashAlpha = 0.15 * (1 - hitAge / 500);
+        ctx.save();
+        ctx.fillStyle = `rgba(255, 0, 0, ${flashAlpha})`;
+        ctx.fillRect(0, 0, W, H);
+        ctx.restore();
+      }
 
       // Center line
       ctx.setLineDash([12, 12]);
@@ -240,8 +293,8 @@ export default function PongGame({ playerName }: { playerName: string }) {
       // Left paddle
       ctx.save();
       ctx.shadowColor = "#22d3ee";
-      ctx.shadowBlur = 20;
-      ctx.fillStyle = "#22d3ee";
+      ctx.shadowBlur = state.slowed?.left ? 40 : 20;
+      ctx.fillStyle = state.slowed?.left ? "#ff4444" : "#22d3ee";
       const lx = paddleLeftX - paddleW / 2;
       const ly = paddleLeftY - paddleH / 2;
       ctx.beginPath();
@@ -249,21 +302,17 @@ export default function PongGame({ playerName }: { playerName: string }) {
       ctx.fill();
       ctx.restore();
 
-      // Left paddle name — removed (now shown next to cursor)
-
       // Right paddle
       ctx.save();
       ctx.shadowColor = "#f43f5e";
-      ctx.shadowBlur = 20;
-      ctx.fillStyle = "#f43f5e";
+      ctx.shadowBlur = state.slowed?.right ? 40 : 20;
+      ctx.fillStyle = state.slowed?.right ? "#ff4444" : "#f43f5e";
       const rx = paddleRightX - paddleW / 2;
       const ry = paddleRightY - paddleH / 2;
       ctx.beginPath();
       ctx.roundRect(rx, ry, paddleW, paddleH, 4);
       ctx.fill();
       ctx.restore();
-
-      // Right paddle name — removed (now shown next to cursor)
 
       // Compute ball speed for glow scaling
       const prev = prevBallRef.current;
@@ -273,7 +322,6 @@ export default function PongGame({ playerName }: { playerName: string }) {
       ballSpeedRef.current = ballSpeedRef.current * 0.9 + frameSpeed * 0.1;
       prevBallRef.current = { x: ballX, y: ballY };
 
-      // Speed multiplier: 1.0 at rest, up to ~3.0 at high speed
       const speedFactor = Math.min(3, 1 + ballSpeedRef.current / 8);
 
       // Ball trail
@@ -322,12 +370,119 @@ export default function PongGame({ playerName }: { playerName: string }) {
       ctx.fill();
       ctx.restore();
 
+      // Bullets
+      if (state.bullets) {
+        for (const b of state.bullets) {
+          const bx = b.x * W;
+          const by = b.y * H;
+          const bulletColor = b.owner === "left" ? "#22d3ee" : "#f43f5e";
+
+          ctx.save();
+          // Bullet glow
+          const bGrad = ctx.createRadialGradient(bx, by, 0, bx, by, 12);
+          bGrad.addColorStop(0, bulletColor);
+          bGrad.addColorStop(0.5, `${bulletColor}66`);
+          bGrad.addColorStop(1, "transparent");
+          ctx.fillStyle = bGrad;
+          ctx.beginPath();
+          ctx.arc(bx, by, 12, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Bullet core
+          ctx.shadowColor = bulletColor;
+          ctx.shadowBlur = 15;
+          ctx.fillStyle = "#ffffff";
+          ctx.beginPath();
+          ctx.arc(bx, by, 3, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+
+      // Bullet pickup
+      if (state.pickup?.active) {
+        const px = state.pickup.x * W;
+        const py = state.pickup.y * H;
+        const pulse = 0.7 + 0.3 * Math.sin(Date.now() / 300);
+
+        ctx.save();
+        // Pickup glow
+        const pGrad = ctx.createRadialGradient(px, py, 0, px, py, 25);
+        pGrad.addColorStop(0, `rgba(255, 220, 50, ${pulse})`);
+        pGrad.addColorStop(0.4, `rgba(255, 160, 20, ${pulse * 0.5})`);
+        pGrad.addColorStop(1, "transparent");
+        ctx.fillStyle = pGrad;
+        ctx.beginPath();
+        ctx.arc(px, py, 25, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Pickup icon (bullet shape)
+        ctx.shadowColor = "#ffdd33";
+        ctx.shadowBlur = 20;
+        ctx.fillStyle = "#ffdd33";
+        ctx.beginPath();
+        ctx.arc(px, py, 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        // "x3" label
+        ctx.font = `bold 11px 'Courier New', monospace`;
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#ffffff";
+        ctx.shadowBlur = 0;
+        ctx.fillText("x3", px, py + 20);
+        ctx.restore();
+      }
+
+      // Ammo counter (bottom of screen, near cursor side)
+      if (role === "left" || role === "right") {
+        const myAmmo = state.ammo?.[role] ?? 0;
+        if (myAmmo > 0) {
+          ctx.save();
+          const ammoX = W / 2;
+          const ammoY = H - 30;
+          const bulletColor = role === "left" ? "#22d3ee" : "#f43f5e";
+
+          // Draw bullet dots
+          for (let i = 0; i < myAmmo; i++) {
+            const dotX = ammoX - (myAmmo - 1) * 12 / 2 + i * 12;
+            ctx.shadowColor = bulletColor;
+            ctx.shadowBlur = 10;
+            ctx.fillStyle = bulletColor;
+            ctx.beginPath();
+            ctx.arc(dotX, ammoY, 4, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          ctx.font = `bold 10px 'Courier New', monospace`;
+          ctx.textAlign = "center";
+          ctx.fillStyle = "rgba(255,255,255,0.5)";
+          ctx.shadowBlur = 0;
+          ctx.fillText("CLICK TO FIRE", ammoX, ammoY + 16);
+          ctx.restore();
+        }
+      }
+
+      // Slowed indicator
+      if (role !== "spectator" && state.slowed?.[role]) {
+        ctx.save();
+        const slowSize = Math.max(14, Math.floor(H * 0.022));
+        ctx.font = `bold ${slowSize}px 'Courier New', monospace`;
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#ff4444";
+        ctx.shadowColor = "#ff4444";
+        ctx.shadowBlur = 15;
+        const blink = Math.sin(Date.now() / 150) > 0 ? 1 : 0.3;
+        ctx.globalAlpha = blink;
+        ctx.fillText("SLOWED!", W / 2, H * 0.12);
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+
       // Mouse cursor + glow
       ctx.save();
       const cursorColor = "#ffffff";
       const glowRGB = "255, 255, 255";
 
-      // Glow
       const glowGrad = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 50);
       glowGrad.addColorStop(0, `rgba(${glowRGB}, 0.15)`);
       glowGrad.addColorStop(0.5, `rgba(${glowRGB}, 0.05)`);
