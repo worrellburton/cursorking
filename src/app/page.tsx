@@ -136,7 +136,7 @@ export default function Home() {
         <>
           {/* CursorKING logo top center */}
           <div
-            className="fixed top-4 left-1/2 -translate-x-1/2 z-50"
+            className="fixed top-4 left-4 z-50"
             style={{
               fontFamily: "'Courier New', Courier, monospace",
               fontSize: "1.25rem",

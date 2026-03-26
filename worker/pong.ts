@@ -1,15 +1,24 @@
 import { DurableObject } from "cloudflare:workers";
 
 const PADDLE_HEIGHT = 0.14;
+const PADDLE_WIDTH = 0.018;
 const BALL_SIZE = 0.009;
 const BALL_SPEED = 0.007;
-const BALL_ACCEL = 1.02; // 2% faster each hit
+const BALL_ACCEL = 1.02;
 const WIN_SCORE = 3;
 const RESTART_DELAY = 3000;
 
+// Left paddle X clamped to [0.02, 0.45], right to [0.55, 0.98]
+const LEFT_X_MIN = 0.02;
+const LEFT_X_MAX = 0.45;
+const RIGHT_X_MIN = 0.55;
+const RIGHT_X_MAX = 0.98;
+
+type PaddleState = { x: number; y: number };
+
 type GameState = {
   ball: { x: number; y: number; vx: number; vy: number };
-  paddles: { left: number; right: number };
+  paddles: { left: PaddleState; right: PaddleState };
   score: { left: number; right: number };
 };
 
@@ -18,7 +27,6 @@ export class PongRoom extends DurableObject {
   names: Map<WebSocket, string> = new Map();
   spectators: Set<WebSocket> = new Set();
   allSockets: Set<WebSocket> = new Set();
-  // Track cursor positions for lobby display
   cursors: Map<WebSocket, { x: number; y: number; name: string }> = new Map();
   state_: GameState;
   interval: ReturnType<typeof setInterval> | null = null;
@@ -40,7 +48,10 @@ export class PongRoom extends DurableObject {
         vx: BALL_SPEED * dir * Math.cos(angle),
         vy: BALL_SPEED * Math.sin(angle),
       },
-      paddles: { left: 0.5, right: 0.5 },
+      paddles: {
+        left: { x: 0.04, y: 0.5 },
+        right: { x: 0.96, y: 0.5 },
+      },
       score: { left: 0, right: 0 },
     };
   }
@@ -80,10 +91,10 @@ export class PongRoom extends DurableObject {
   startGame() {
     if (this.running) return;
     this.winner = null;
-    this.state_ = { ...this.freshState(), score: { left: 0, right: 0 } };
+    const fresh = this.freshState();
+    this.state_ = { ...fresh, score: { left: 0, right: 0 } };
     this.broadcastState();
 
-    // 3-2-1 countdown
     this.broadcast(JSON.stringify({ type: "countdown", value: 3 }));
     setTimeout(() => {
       this.broadcast(JSON.stringify({ type: "countdown", value: 2 }));
@@ -114,6 +125,7 @@ export class PongRoom extends DurableObject {
     ball.x += ball.vx;
     ball.y += ball.vy;
 
+    // Top/bottom bounce
     if (ball.y - BALL_SIZE <= 0) {
       ball.y = BALL_SIZE;
       ball.vy = Math.abs(ball.vy);
@@ -123,36 +135,51 @@ export class PongRoom extends DurableObject {
       ball.vy = -Math.abs(ball.vy);
     }
 
-    const leftPaddleX = 0.04 + 0.018;
+    // Left paddle collision (rectangle check)
+    const lp = paddles.left;
+    const lpLeft = lp.x - PADDLE_WIDTH / 2;
+    const lpRight = lp.x + PADDLE_WIDTH / 2;
+    const lpTop = lp.y - PADDLE_HEIGHT / 2;
+    const lpBottom = lp.y + PADDLE_HEIGHT / 2;
+
     if (
-      ball.x - BALL_SIZE <= leftPaddleX &&
-      ball.x - BALL_SIZE >= 0.04 &&
-      ball.y >= paddles.left - PADDLE_HEIGHT / 2 &&
-      ball.y <= paddles.left + PADDLE_HEIGHT / 2
+      ball.x - BALL_SIZE <= lpRight &&
+      ball.x + BALL_SIZE >= lpLeft &&
+      ball.y >= lpTop &&
+      ball.y <= lpBottom &&
+      ball.vx < 0
     ) {
-      ball.x = leftPaddleX + BALL_SIZE;
-      const hitPos = (ball.y - paddles.left) / (PADDLE_HEIGHT / 2);
+      ball.x = lpRight + BALL_SIZE;
+      const hitPos = (ball.y - lp.y) / (PADDLE_HEIGHT / 2);
       const angle = hitPos * (Math.PI / 4);
       const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * BALL_ACCEL;
       ball.vx = Math.abs(speed * Math.cos(angle));
       ball.vy = speed * Math.sin(angle);
     }
 
-    const rightPaddleX = 1 - 0.04 - 0.018;
+    // Right paddle collision
+    const rp = paddles.right;
+    const rpLeft = rp.x - PADDLE_WIDTH / 2;
+    const rpRight = rp.x + PADDLE_WIDTH / 2;
+    const rpTop = rp.y - PADDLE_HEIGHT / 2;
+    const rpBottom = rp.y + PADDLE_HEIGHT / 2;
+
     if (
-      ball.x + BALL_SIZE >= rightPaddleX &&
-      ball.x + BALL_SIZE <= 1 - 0.04 &&
-      ball.y >= paddles.right - PADDLE_HEIGHT / 2 &&
-      ball.y <= paddles.right + PADDLE_HEIGHT / 2
+      ball.x + BALL_SIZE >= rpLeft &&
+      ball.x - BALL_SIZE <= rpRight &&
+      ball.y >= rpTop &&
+      ball.y <= rpBottom &&
+      ball.vx > 0
     ) {
-      ball.x = rightPaddleX - BALL_SIZE;
-      const hitPos = (ball.y - paddles.right) / (PADDLE_HEIGHT / 2);
+      ball.x = rpLeft - BALL_SIZE;
+      const hitPos = (ball.y - rp.y) / (PADDLE_HEIGHT / 2);
       const angle = hitPos * (Math.PI / 4);
       const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * BALL_ACCEL;
       ball.vx = -Math.abs(speed * Math.cos(angle));
       ball.vy = speed * Math.sin(angle);
     }
 
+    // Scoring
     if (ball.x < 0) {
       this.state_.score.right++;
       if (this.state_.score.right >= WIN_SCORE) {
@@ -293,7 +320,16 @@ export class PongRoom extends DurableObject {
         PADDLE_HEIGHT / 2,
         Math.min(1 - PADDLE_HEIGHT / 2, data.y)
       );
-      this.state_.paddles[role] = y;
+
+      // Clamp X to player's half
+      let x: number;
+      if (role === "left") {
+        x = Math.max(LEFT_X_MIN, Math.min(LEFT_X_MAX, data.x ?? 0.04));
+      } else {
+        x = Math.max(RIGHT_X_MIN, Math.min(RIGHT_X_MAX, data.x ?? 0.96));
+      }
+
+      this.state_.paddles[role] = { x, y };
 
       if (!this.running) {
         this.broadcastState();
