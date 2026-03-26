@@ -1,6 +1,11 @@
-import CursorCanvas from "@/components/CursorCanvas";
+"use client";
+
+import { useState } from "react";
+import PongGame from "@/components/PongGame";
 
 export default function Home() {
+  const [started, setStarted] = useState(false);
+
   return (
     <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
       {/* Grid background */}
@@ -13,23 +18,26 @@ export default function Home() {
         }}
       />
 
-      {/* Hero content */}
-      <div className="relative z-10 flex flex-col items-center gap-6 text-center px-4">
-        <h1 className="text-6xl font-bold tracking-tight text-white sm:text-8xl">
-          Cursor<span className="text-cyan-400">King</span>
-        </h1>
-        <p className="max-w-md text-lg text-gray-400">
-          Move your cursor around. See everyone else&apos;s cursors in realtime
-          from all over the world.
-        </p>
-        <div className="mt-4 flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-5 py-3 text-sm text-gray-300">
-          <span className="font-mono text-cyan-400">{">"}</span>
-          Just move your mouse to play
+      {!started ? (
+        <div className="relative z-10 flex flex-col items-center gap-10 text-center px-4">
+          <h1 className="text-7xl font-bold tracking-tight text-white sm:text-9xl">
+            Cursor<span className="text-cyan-400">KING</span>
+          </h1>
+          <button
+            onClick={() => setStarted(true)}
+            className="rounded-full border-2 border-cyan-400 bg-transparent px-12 py-4 text-xl font-semibold text-cyan-400 transition-all hover:bg-cyan-400 hover:text-gray-950 hover:scale-105 active:scale-95"
+          >
+            Start
+          </button>
         </div>
-      </div>
-
-      {/* Realtime cursors overlay */}
-      <CursorCanvas />
+      ) : (
+        <>
+          <div className="fixed top-4 left-4 z-50 text-xl font-bold text-white">
+            Cursor<span className="text-cyan-400">KING</span>
+          </div>
+          <PongGame />
+        </>
+      )}
     </main>
   );
 }

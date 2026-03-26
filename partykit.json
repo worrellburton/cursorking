@@ -1,6 +1,10 @@
 {
   "$schema": "https://www.partykit.io/schema.json",
   "name": "cursorking",
-  "main": "party/cursors.ts",
+  "main": "party/pong.ts",
+  "parties": {
+    "cursors": "party/cursors.ts",
+    "pong": "party/pong.ts"
+  },
   "compatibilityDate": "2024-01-01"
 }
