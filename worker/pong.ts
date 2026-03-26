@@ -172,7 +172,7 @@ export class PongRoom extends DurableObject {
       ball.vy = -Math.abs(ball.vy);
     }
 
-    // Left paddle collision
+    // Left paddle collision (can hit from either side)
     const lp = paddles.left;
     const lpLeft = lp.x - PADDLE_WIDTH / 2;
     const lpRight = lp.x + PADDLE_WIDTH / 2;
@@ -183,18 +183,23 @@ export class PongRoom extends DurableObject {
       ball.x - BALL_SIZE <= lpRight &&
       ball.x + BALL_SIZE >= lpLeft &&
       ball.y >= lpTop &&
-      ball.y <= lpBottom &&
-      ball.vx < 0
+      ball.y <= lpBottom
     ) {
-      ball.x = lpRight + BALL_SIZE;
       const hitPos = (ball.y - lp.y) / (PADDLE_HEIGHT / 2);
       const angle = hitPos * (Math.PI / 4);
       const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * BALL_ACCEL;
-      ball.vx = Math.abs(speed * Math.cos(angle));
+      // Reflect based on which side of paddle ball is on
+      if (ball.x < lp.x) {
+        ball.x = lpLeft - BALL_SIZE;
+        ball.vx = -Math.abs(speed * Math.cos(angle));
+      } else {
+        ball.x = lpRight + BALL_SIZE;
+        ball.vx = Math.abs(speed * Math.cos(angle));
+      }
       ball.vy = speed * Math.sin(angle);
     }
 
-    // Right paddle collision
+    // Right paddle collision (can hit from either side)
     const rp = paddles.right;
     const rpLeft = rp.x - PADDLE_WIDTH / 2;
     const rpRight = rp.x + PADDLE_WIDTH / 2;
@@ -205,14 +210,18 @@ export class PongRoom extends DurableObject {
       ball.x + BALL_SIZE >= rpLeft &&
       ball.x - BALL_SIZE <= rpRight &&
       ball.y >= rpTop &&
-      ball.y <= rpBottom &&
-      ball.vx > 0
+      ball.y <= rpBottom
     ) {
-      ball.x = rpLeft - BALL_SIZE;
       const hitPos = (ball.y - rp.y) / (PADDLE_HEIGHT / 2);
       const angle = hitPos * (Math.PI / 4);
       const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * BALL_ACCEL;
-      ball.vx = -Math.abs(speed * Math.cos(angle));
+      if (ball.x > rp.x) {
+        ball.x = rpRight + BALL_SIZE;
+        ball.vx = Math.abs(speed * Math.cos(angle));
+      } else {
+        ball.x = rpLeft - BALL_SIZE;
+        ball.vx = -Math.abs(speed * Math.cos(angle));
+      }
       ball.vy = speed * Math.sin(angle);
     }
 
