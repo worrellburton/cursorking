@@ -33,6 +33,7 @@ type GameState = {
 export class PongRoom extends DurableObject {
   players: Map<WebSocket, "left" | "right"> = new Map();
   names: Map<WebSocket, string> = new Map();
+  locations: Map<WebSocket, string> = new Map();
   spectators: Set<WebSocket> = new Set();
   allSockets: Set<WebSocket> = new Set();
   cursors: Map<WebSocket, { x: number; y: number; name: string }> = new Map();
@@ -89,6 +90,13 @@ export class PongRoom extends DurableObject {
   getNameForRole(role: "left" | "right"): string {
     for (const [ws, r] of this.players) {
       if (r === role) return this.names.get(ws) ?? "";
+    }
+    return "";
+  }
+
+  getLocationForRole(role: "left" | "right"): string {
+    for (const [ws, r] of this.players) {
+      if (r === role) return this.locations.get(ws) ?? "";
     }
     return "";
   }
@@ -301,6 +309,10 @@ export class PongRoom extends DurableObject {
             left: this.getNameForRole("left"),
             right: this.getNameForRole("right"),
           },
+          locations: {
+            left: this.getLocationForRole("left"),
+            right: this.getLocationForRole("right"),
+          },
           winner: this.winner,
           bullets: this.bullets.map(b => ({ x: b.x, y: b.y, owner: b.owner })),
           ammo: this.ammo,
@@ -350,6 +362,10 @@ export class PongRoom extends DurableObject {
             left: this.getNameForRole("left"),
             right: this.getNameForRole("right"),
           },
+          locations: {
+            left: this.getLocationForRole("left"),
+            right: this.getLocationForRole("right"),
+          },
           winner: this.winner,
           bullets: this.bullets.map(b => ({ x: b.x, y: b.y, owner: b.owner })),
           ammo: this.ammo,
@@ -377,6 +393,7 @@ export class PongRoom extends DurableObject {
 
     if (data.type === "set-name") {
       this.names.set(ws, String(data.name).slice(0, 12));
+      if (data.location) this.locations.set(ws, String(data.location).slice(0, 30));
       this.broadcastState();
       return;
     }
@@ -450,6 +467,7 @@ export class PongRoom extends DurableObject {
     const role = this.players.get(ws);
     this.players.delete(ws);
     this.names.delete(ws);
+    this.locations.delete(ws);
     this.spectators.delete(ws);
     this.allSockets.delete(ws);
     this.cursors.delete(ws);

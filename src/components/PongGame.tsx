@@ -23,6 +23,7 @@ type GameState = {
   paddles: { left: PaddleState; right: PaddleState };
   score: { left: number; right: number };
   names: { left: string; right: string };
+  locations: { left: string; right: string };
   winner: string | null;
   bullets: { x: number; y: number; owner: "left" | "right" }[];
   ammo: { left: number; right: number };
@@ -42,6 +43,7 @@ export default function PongGame({ playerName }: { playerName: string }) {
     paddles: { left: { x: 0.04, y: 0.5 }, right: { x: 0.96, y: 0.5 } },
     score: { left: 0, right: 0 },
     names: { left: "", right: "" },
+    locations: { left: "", right: "" },
     winner: null,
     bullets: [],
     ammo: { left: 0, right: 0 },
@@ -66,8 +68,22 @@ export default function PongGame({ playerName }: { playerName: string }) {
   const serverBallDtRef = useRef(16.67);
   const interpBallRef = useRef({ x: 0.5, y: 0.5 });
 
+  const locationRef = useRef("");
+
   // Only playerCount triggers React re-render (for the HUD text)
   const [playerCount, setPlayerCount] = useState(0);
+
+  // Fetch player location
+  useEffect(() => {
+    fetch("https://ipapi.co/json/")
+      .then(r => r.json())
+      .then(data => {
+        const city = data.city || "";
+        const country = data.country_code || "";
+        locationRef.current = city ? `${city}, ${country}` : country;
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     function connect() {
@@ -75,7 +91,7 @@ export default function PongGame({ playerName }: { playerName: string }) {
 
       ws.onopen = () => {
         wsRef.current = ws;
-        ws.send(JSON.stringify({ type: "set-name", name: playerName }));
+        ws.send(JSON.stringify({ type: "set-name", name: playerName, location: locationRef.current }));
       };
 
       ws.onmessage = (event) => {
@@ -284,10 +300,24 @@ export default function PongGame({ playerName }: { playerName: string }) {
       if (state.names.left) {
         ctx.fillStyle = "rgba(34, 211, 238, 0.6)";
         ctx.fillText(state.names.left.toUpperCase(), W / 4, H * 0.05);
+        if (state.locations?.left) {
+          const locSize = Math.max(10, Math.floor(H * 0.016));
+          ctx.font = `${locSize}px 'Courier New', monospace`;
+          ctx.fillStyle = "rgba(34, 211, 238, 0.3)";
+          ctx.fillText(state.locations.left.toUpperCase(), W / 4, H * 0.05 + nameSize * 0.9);
+          ctx.font = `bold ${nameSize}px 'Courier New', monospace`;
+        }
       }
       if (state.names.right) {
         ctx.fillStyle = "rgba(244, 63, 94, 0.6)";
         ctx.fillText(state.names.right.toUpperCase(), (W * 3) / 4, H * 0.05);
+        if (state.locations?.right) {
+          const locSize = Math.max(10, Math.floor(H * 0.016));
+          ctx.font = `${locSize}px 'Courier New', monospace`;
+          ctx.fillStyle = "rgba(244, 63, 94, 0.3)";
+          ctx.fillText(state.locations.right.toUpperCase(), (W * 3) / 4, H * 0.05 + nameSize * 0.9);
+          ctx.font = `bold ${nameSize}px 'Courier New', monospace`;
+        }
       }
 
       // Left paddle
