@@ -71,7 +71,11 @@ export default function MenuCursor({ name }: { name: string }) {
       ctx.stroke();
       ctx.restore();
 
-      // Name label
+      // Name label (only if name provided)
+      if (!name) {
+        animId = requestAnimationFrame(draw);
+        return;
+      }
       ctx.save();
       ctx.font = "bold 11px 'Courier New', monospace";
       ctx.textAlign = "left";
