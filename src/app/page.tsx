@@ -1,16 +1,23 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import SpaceBackground from "@/components/SpaceBackground";
 import PongGame from "@/components/PongGame";
 import MenuCursor from "@/components/MenuCursor";
 
-type Screen = "name" | "start" | "game";
+type Screen = "name" | "start" | "game" | "mobile";
 
 export default function Home() {
   const [playerName, setPlayerName] = useState("");
   const [screen, setScreen] = useState<Screen>("name");
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    const isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent
+    ) || (window.matchMedia("(pointer: coarse)").matches && window.innerWidth < 1024);
+    if (isMobile) setScreen("mobile");
+  }, []);
 
   const handleNameSubmit = () => {
     if (!playerName.trim()) return;
@@ -98,6 +105,51 @@ export default function Home() {
     <main className={`relative flex min-h-screen flex-col items-center justify-center overflow-hidden ${screen !== "name" ? "cursor-none" : ""}`}>
       <SpaceBackground />
       {screen === "start" && <MenuCursor name={playerName} />}
+
+      {screen === "mobile" && (
+        <div className="relative z-10 flex flex-col items-center gap-6 text-center px-8">
+          <h1
+            className="text-5xl font-bold tracking-widest text-white"
+            style={{
+              fontFamily: "'Courier New', Courier, monospace",
+              textShadow:
+                "0 0 20px rgba(34, 211, 238, 0.8), 0 0 40px rgba(34, 211, 238, 0.4)",
+            }}
+          >
+            CURSOR
+            <span
+              style={{
+                color: "#22d3ee",
+                textShadow:
+                  "0 0 20px rgba(34, 211, 238, 1), 0 0 40px rgba(34, 211, 238, 0.6)",
+              }}
+            >
+              KING
+            </span>
+          </h1>
+          <p
+            style={{
+              fontFamily: "'Courier New', Courier, monospace",
+              fontSize: "1rem",
+              color: "rgba(255, 255, 255, 0.6)",
+              letterSpacing: "0.1em",
+              lineHeight: "1.8",
+            }}
+          >
+            SORRY, NOT AVAILABLE ON MOBILE
+          </p>
+          <p
+            style={{
+              fontFamily: "'Courier New', Courier, monospace",
+              fontSize: "0.75rem",
+              color: "rgba(255, 255, 255, 0.3)",
+              letterSpacing: "0.1em",
+            }}
+          >
+            PLEASE VISIT ON A DESKTOP BROWSER
+          </p>
+        </div>
+      )}
 
       {screen === "name" && (
         <div className="relative z-10 flex items-center justify-center px-4">
