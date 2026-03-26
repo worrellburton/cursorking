@@ -14,14 +14,19 @@ export default function Home() {
 
   const handleNameSubmit = () => {
     if (!playerName.trim()) return;
+    // Pre-load audio on this user gesture to unlock Chrome autoplay
+    const audio = new Audio(`${process.env.NODE_ENV === "production" ? "/cursorking" : ""}/menu.mp3`);
+    audio.volume = 0.5;
+    audio.load();
+    audioRef.current = audio;
     setScreen("start");
   };
 
   const handleStart = () => {
-    const audio = new Audio(`${process.env.NODE_ENV === "production" ? "/cursorking" : ""}/menu.mp3`);
-    audio.volume = 0.5;
-    audio.play().catch(() => {});
-    audioRef.current = audio;
+    // Play on this user gesture — already unlocked from name submit click
+    if (audioRef.current) {
+      audioRef.current.play().catch(() => {});
+    }
     setScreen("game");
   };
 
