@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import SpaceBackground from "@/components/SpaceBackground";
 import PongGame from "@/components/PongGame";
+import MenuCursor from "@/components/MenuCursor";
 
 type Screen = "name" | "start" | "game";
 
@@ -85,7 +86,7 @@ export default function Home() {
   );
 
   return (
-    <main className={`relative flex min-h-screen flex-col items-center justify-center overflow-hidden ${screen === "game" ? "cursor-none" : ""}`}>
+    <main className={`relative flex min-h-screen flex-col items-center justify-center overflow-hidden ${screen !== "name" ? "cursor-none" : ""}`}>
       <SpaceBackground />
 
       {screen === "name" && (
@@ -145,22 +146,25 @@ export default function Home() {
       )}
 
       {screen === "start" && (
-        <div className="relative z-10 flex flex-col items-center gap-10 text-center px-4">
-          {titleEl}
+        <>
+          <MenuCursor name={playerName} />
+          <div className="relative z-10 flex flex-col items-center gap-10 text-center px-4">
+            {titleEl}
 
-          <p
-            style={{
-              fontFamily: "'Courier New', Courier, monospace",
-              fontSize: "1.1rem",
-              color: "rgba(255, 255, 255, 0.6)",
-              letterSpacing: "0.1em",
-            }}
-          >
-            Welcome, <span style={{ color: "#22d3ee" }}>{playerName.toUpperCase()}</span>
-          </p>
+            <p
+              style={{
+                fontFamily: "'Courier New', Courier, monospace",
+                fontSize: "1.1rem",
+                color: "rgba(255, 255, 255, 0.6)",
+                letterSpacing: "0.1em",
+              }}
+            >
+              Welcome, <span style={{ color: "#22d3ee" }}>{playerName.toUpperCase()}</span>
+            </p>
 
-          {pillButton("START", true, handleStart)}
-        </div>
+            {pillButton("START", true, handleStart)}
+          </div>
+        </>
       )}
 
       {screen === "game" && (

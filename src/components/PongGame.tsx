@@ -275,8 +275,8 @@ export default function PongGame({ playerName }: { playerName: string }) {
 
       // Mouse cursor + glow
       ctx.save();
-      const cursorColor = role === "left" ? "#22d3ee" : role === "right" ? "#f43f5e" : "#ffffff";
-      const glowRGB = role === "left" ? "34, 211, 238" : role === "right" ? "244, 63, 94" : "255, 255, 255";
+      const cursorColor = "#ffffff";
+      const glowRGB = "255, 255, 255";
 
       // Glow
       const glowGrad = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 50);
@@ -370,13 +370,6 @@ export default function PongGame({ playerName }: { playerName: string }) {
     };
   }, []);
 
-  const roleLabel =
-    myRole === "left"
-      ? `You are CYAN — ${playerName}`
-      : myRole === "right"
-        ? `You are RED — ${playerName}`
-        : "Spectating — waiting for a spot";
-
   return (
     <>
       <canvas
@@ -385,24 +378,49 @@ export default function PongGame({ playerName }: { playerName: string }) {
         style={{ width: "100vw", height: "100vh" }}
       />
 
-      <div className="fixed top-4 right-4 z-50 flex items-center gap-6">
+      <div
+        className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-full px-5 py-2"
+        style={{
+          fontFamily: "'Courier New', monospace",
+          background: "rgba(0, 0, 0, 0.4)",
+          backdropFilter: "blur(8px)",
+          border: "1px solid rgba(34, 211, 238, 0.2)",
+          boxShadow: "0 0 20px rgba(34, 211, 238, 0.15), inset 0 0 10px rgba(34, 211, 238, 0.05)",
+          animation: "glow-pulse 2s ease-in-out infinite",
+        }}
+      >
         <span
-          className={`text-sm font-medium ${
-            myRole === "left"
-              ? "text-cyan-400"
-              : myRole === "right"
-                ? "text-rose-400"
-                : "text-gray-400"
-          }`}
-          style={{ fontFamily: "'Courier New', monospace" }}
+          className="inline-block h-2.5 w-2.5 rounded-full"
+          style={{
+            background: "#22d3ee",
+            boxShadow: "0 0 8px #22d3ee, 0 0 16px rgba(34, 211, 238, 0.5)",
+            animation: "glow-dot 1.5s ease-in-out infinite",
+          }}
+        />
+        <span
+          className="text-sm font-bold"
+          style={{
+            color: "#22d3ee",
+            textShadow: "0 0 10px rgba(34, 211, 238, 0.8)",
+          }}
         >
-          {roleLabel}
+          {playerCount}
         </span>
-        <span className="flex items-center gap-2 text-sm text-gray-400">
-          <span className="inline-block h-2 w-2 rounded-full bg-green-400 animate-pulse" />
-          {playerCount} {playerCount === 1 ? "player" : "players"}
+        <span className="text-xs text-gray-400">
+          GLOBAL {playerCount === 1 ? "PLAYER" : "PLAYERS"}
         </span>
       </div>
+
+      <style jsx>{`
+        @keyframes glow-pulse {
+          0%, 100% { box-shadow: 0 0 20px rgba(34, 211, 238, 0.15), inset 0 0 10px rgba(34, 211, 238, 0.05); }
+          50% { box-shadow: 0 0 30px rgba(34, 211, 238, 0.3), inset 0 0 15px rgba(34, 211, 238, 0.1); }
+        }
+        @keyframes glow-dot {
+          0%, 100% { box-shadow: 0 0 8px #22d3ee, 0 0 16px rgba(34, 211, 238, 0.5); }
+          50% { box-shadow: 0 0 12px #22d3ee, 0 0 24px rgba(34, 211, 238, 0.8); }
+        }
+      `}</style>
     </>
   );
 }
