@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 
-const PADDLE_WIDTH = 14;
-const PADDLE_HEIGHT = 100;
-const PADDLE_OFFSET = 30;
-const BALL_SIZE = 10;
+const PADDLE_WIDTH = 10;
+const PADDLE_HEIGHT = 70;
+const PADDLE_OFFSET = 24;
+const BALL_SIZE = 7;
 
 const WS_URL =
   process.env.NEXT_PUBLIC_WS_URL ?? "wss://cursorking-pong.worrellburton.workers.dev";
@@ -14,36 +14,45 @@ type GameState = {
   ball: { x: number; y: number };
   paddles: { left: number; right: number };
   score: { left: number; right: number };
+  names: { left: string; right: string };
+  winner: string | null;
 };
 
 type BallTrail = { x: number; y: number; age: number };
 
-export default function PongGame() {
+export default function PongGame({ playerName }: { playerName: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const [gameState, setGameState] = useState<GameState>({
     ball: { x: 0.5, y: 0.5 },
     paddles: { left: 0.5, right: 0.5 },
     score: { left: 0, right: 0 },
+    names: { left: "", right: "" },
+    winner: null,
   });
   const [myRole, setMyRole] = useState<"left" | "right" | "spectator">("spectator");
   const [playerCount, setPlayerCount] = useState(0);
+  const [countdown, setCountdown] = useState<number | null>(null);
   const gameStateRef = useRef(gameState);
   const myRoleRef = useRef(myRole);
+  const countdownRef = useRef(countdown);
   const lastSentRef = useRef(0);
   const mouseRef = useRef({ x: 0, y: 0 });
   const ballTrailRef = useRef<BallTrail[]>([]);
   const canvasSizeRef = useRef({ w: 800, h: 500 });
+  const playerCountRef = useRef(playerCount);
   gameStateRef.current = gameState;
   myRoleRef.current = myRole;
+  countdownRef.current = countdown;
+  playerCountRef.current = playerCount;
 
-  // WebSocket connection
   useEffect(() => {
     function connect() {
       const ws = new WebSocket(WS_URL);
 
       ws.onopen = () => {
         wsRef.current = ws;
+        ws.send(JSON.stringify({ type: "set-name", name: playerName }));
       };
 
       ws.onmessage = (event) => {
@@ -56,6 +65,9 @@ export default function PongGame() {
         }
         if (msg.type === "player-count") {
           setPlayerCount(msg.count);
+        }
+        if (msg.type === "countdown") {
+          setCountdown(msg.value > 0 ? msg.value : null);
         }
       };
 
@@ -73,7 +85,7 @@ export default function PongGame() {
     return () => {
       wsRef.current?.close();
     };
-  }, []);
+  }, [playerName]);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
     mouseRef.current = { x: e.clientX, y: e.clientY };
@@ -82,19 +94,15 @@ export default function PongGame() {
 
     const { w, h } = canvasSizeRef.current;
 
-    // Check if cursor is within the player's 40% zone
     const relX = e.clientX / w;
     if (role === "left" && relX > 0.4) return;
     if (role === "right" && relX < 0.6) return;
 
-    // Throttle to ~60fps
     const now = Date.now();
     if (now - lastSentRef.current < 16) return;
     lastSentRef.current = now;
 
-    // Send normalized Y (0-1)
     const normalizedY = Math.max(0, Math.min(1, e.clientY / h));
-
     wsRef.current?.send(JSON.stringify({ type: "paddle-move", y: normalizedY }));
   }, []);
 
@@ -103,7 +111,6 @@ export default function PongGame() {
     return () => window.removeEventListener("pointermove", handlePointerMove);
   }, [handlePointerMove]);
 
-  // Canvas rendering - full browser
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -126,10 +133,11 @@ export default function PongGame() {
       const state = gameStateRef.current;
       const role = myRoleRef.current;
       const mouse = mouseRef.current;
+      const cd = countdownRef.current;
+      const count = playerCountRef.current;
       const W = canvas.width;
       const H = canvas.height;
 
-      // Convert normalized server coords to screen
       const ballX = state.ball.x * W;
       const ballY = state.ball.y * H;
       const paddleLeftY = state.paddles.left * H;
@@ -139,10 +147,9 @@ export default function PongGame() {
       const paddleOff = PADDLE_OFFSET * (W / 800);
       const ballR = BALL_SIZE * Math.min(W / 800, H / 500);
 
-      // Clear (transparent — space bg shows through)
       ctx.clearRect(0, 0, W, H);
 
-      // Player's 40% zone highlight
+      // Zone highlights
       if (role === "left") {
         const grad = ctx.createLinearGradient(0, 0, W * 0.4, 0);
         grad.addColorStop(0, "rgba(34, 211, 238, 0.04)");
@@ -174,34 +181,70 @@ export default function PongGame() {
       ctx.fillText(String(state.score.left), W / 4, H * 0.18);
       ctx.fillText(String(state.score.right), (W * 3) / 4, H * 0.18);
 
-      // Left paddle (glowing)
+      // Player names above scores
+      const nameSize = Math.max(14, Math.floor(H * 0.025));
+      ctx.font = `bold ${nameSize}px 'Courier New', monospace`;
+
+      if (state.names.left) {
+        ctx.fillStyle = "rgba(34, 211, 238, 0.6)";
+        ctx.fillText(state.names.left.toUpperCase(), W / 4, H * 0.05);
+      }
+      if (state.names.right) {
+        ctx.fillStyle = "rgba(244, 63, 94, 0.6)";
+        ctx.fillText(state.names.right.toUpperCase(), (W * 3) / 4, H * 0.05);
+      }
+
+      // Left paddle
       ctx.save();
       ctx.shadowColor = "#22d3ee";
-      ctx.shadowBlur = 25;
+      ctx.shadowBlur = 20;
       ctx.fillStyle = "#22d3ee";
       const lx = paddleOff;
       const ly = paddleLeftY - paddleH / 2;
       ctx.beginPath();
-      ctx.roundRect(lx, ly, paddleW, paddleH, 6);
+      ctx.roundRect(lx, ly, paddleW, paddleH, 4);
       ctx.fill();
       ctx.restore();
 
-      // Right paddle (glowing)
+      // Left paddle name
+      if (state.names.left) {
+        ctx.save();
+        ctx.font = `bold ${Math.max(10, Math.floor(H * 0.016))}px 'Courier New', monospace`;
+        ctx.fillStyle = "#22d3ee";
+        ctx.shadowColor = "#22d3ee";
+        ctx.shadowBlur = 8;
+        ctx.textAlign = "left";
+        ctx.fillText(state.names.left.toUpperCase(), lx + paddleW + 6, paddleLeftY + 4);
+        ctx.restore();
+      }
+
+      // Right paddle
       ctx.save();
       ctx.shadowColor = "#f43f5e";
-      ctx.shadowBlur = 25;
+      ctx.shadowBlur = 20;
       ctx.fillStyle = "#f43f5e";
       const rx = W - paddleOff - paddleW;
       const ry = paddleRightY - paddleH / 2;
       ctx.beginPath();
-      ctx.roundRect(rx, ry, paddleW, paddleH, 6);
+      ctx.roundRect(rx, ry, paddleW, paddleH, 4);
       ctx.fill();
       ctx.restore();
+
+      // Right paddle name
+      if (state.names.right) {
+        ctx.save();
+        ctx.font = `bold ${Math.max(10, Math.floor(H * 0.016))}px 'Courier New', monospace`;
+        ctx.fillStyle = "#f43f5e";
+        ctx.shadowColor = "#f43f5e";
+        ctx.shadowBlur = 8;
+        ctx.textAlign = "right";
+        ctx.fillText(state.names.right.toUpperCase(), rx - 6, paddleRightY + 4);
+        ctx.restore();
+      }
 
       // Ball trail
       const trail = ballTrailRef.current;
       trail.push({ x: ballX, y: ballY, age: 0 });
-      // Keep last 20 trail points
       while (trail.length > 20) trail.shift();
 
       for (let i = 0; i < trail.length; i++) {
@@ -211,7 +254,6 @@ export default function PongGame() {
         if (life <= 0) continue;
 
         const r = ballR * life * 0.8;
-        // Fire gradient: white center -> yellow -> orange -> red -> transparent
         const grad = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, r * 3);
         grad.addColorStop(0, `rgba(255, 200, 50, ${life * 0.6})`);
         grad.addColorStop(0.3, `rgba(255, 100, 20, ${life * 0.4})`);
@@ -223,9 +265,9 @@ export default function PongGame() {
         ctx.fill();
       }
 
-      // Ball (glowing white-hot core)
+      // Ball
       ctx.save();
-      const ballGrad = ctx.createRadialGradient(ballX, ballY, 0, ballX, ballY, ballR * 4);
+      const ballGrad = ctx.createRadialGradient(ballX, ballY, 0, ballX, ballY, ballR * 3.5);
       ballGrad.addColorStop(0, "rgba(255, 255, 255, 1)");
       ballGrad.addColorStop(0.15, "rgba(255, 240, 180, 0.9)");
       ballGrad.addColorStop(0.3, "rgba(255, 160, 50, 0.5)");
@@ -233,12 +275,11 @@ export default function PongGame() {
       ballGrad.addColorStop(1, "rgba(200, 0, 0, 0)");
       ctx.fillStyle = ballGrad;
       ctx.beginPath();
-      ctx.arc(ballX, ballY, ballR * 4, 0, Math.PI * 2);
+      ctx.arc(ballX, ballY, ballR * 3.5, 0, Math.PI * 2);
       ctx.fill();
 
-      // Bright core
       ctx.shadowColor = "#ffffff";
-      ctx.shadowBlur = 30;
+      ctx.shadowBlur = 20;
       ctx.fillStyle = "#ffffff";
       ctx.beginPath();
       ctx.arc(ballX, ballY, ballR, 0, Math.PI * 2);
@@ -247,19 +288,68 @@ export default function PongGame() {
 
       // Mouse glow
       ctx.save();
-      const glowGrad = ctx.createRadialGradient(
-        mouse.x, mouse.y, 0,
-        mouse.x, mouse.y, 80
-      );
+      const glowGrad = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 60);
       const glowColor = role === "left" ? "34, 211, 238" : role === "right" ? "244, 63, 94" : "255, 255, 255";
       glowGrad.addColorStop(0, `rgba(${glowColor}, 0.15)`);
       glowGrad.addColorStop(0.5, `rgba(${glowColor}, 0.05)`);
       glowGrad.addColorStop(1, `rgba(${glowColor}, 0)`);
       ctx.fillStyle = glowGrad;
       ctx.beginPath();
-      ctx.arc(mouse.x, mouse.y, 80, 0, Math.PI * 2);
+      ctx.arc(mouse.x, mouse.y, 60, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
+
+      // Waiting for player message
+      if (count < 2 && !state.winner && role !== "spectator") {
+        ctx.save();
+        const waitSize = Math.max(16, Math.floor(H * 0.03));
+        ctx.font = `${waitSize}px 'Courier New', monospace`;
+        ctx.textAlign = "center";
+        ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+        const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 500);
+        ctx.globalAlpha = 0.4 + pulse * 0.3;
+        ctx.fillText("WAITING FOR PLAYER...", W / 2, H / 2);
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+
+      // Countdown overlay
+      if (cd !== null) {
+        ctx.save();
+        ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+        ctx.fillRect(0, 0, W, H);
+
+        const cdSize = Math.max(60, Math.floor(H * 0.2));
+        ctx.font = `bold ${cdSize}px 'Courier New', monospace`;
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#22d3ee";
+        ctx.shadowColor = "#22d3ee";
+        ctx.shadowBlur = 40;
+        ctx.fillText(String(cd), W / 2, H / 2 + cdSize * 0.35);
+        ctx.restore();
+      }
+
+      // Winner overlay
+      if (state.winner) {
+        ctx.save();
+        ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+        ctx.fillRect(0, 0, W, H);
+
+        const winSize = Math.max(24, Math.floor(H * 0.08));
+        ctx.font = `bold ${winSize}px 'Courier New', monospace`;
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#22d3ee";
+        ctx.shadowColor = "#22d3ee";
+        ctx.shadowBlur = 30;
+        ctx.fillText(`${state.winner.toUpperCase()} WINS!`, W / 2, H / 2 - winSize * 0.3);
+
+        const subSize = Math.max(14, Math.floor(H * 0.025));
+        ctx.font = `${subSize}px 'Courier New', monospace`;
+        ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+        ctx.shadowBlur = 0;
+        ctx.fillText("New game starting soon...", W / 2, H / 2 + winSize * 0.8);
+        ctx.restore();
+      }
 
       animId = requestAnimationFrame(draw);
     }
@@ -273,9 +363,9 @@ export default function PongGame() {
 
   const roleLabel =
     myRole === "left"
-      ? "You are CYAN (left)"
+      ? `You are CYAN — ${playerName}`
       : myRole === "right"
-        ? "You are RED (right)"
+        ? `You are RED — ${playerName}`
         : "Spectating — waiting for a spot";
 
   return (
@@ -286,7 +376,6 @@ export default function PongGame() {
         style={{ width: "100vw", height: "100vh" }}
       />
 
-      {/* HUD overlay */}
       <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-6">
         <span
           className={`text-sm font-medium ${
@@ -296,6 +385,7 @@ export default function PongGame() {
                 ? "text-rose-400"
                 : "text-gray-400"
           }`}
+          style={{ fontFamily: "'Courier New', monospace" }}
         >
           {roleLabel}
         </span>

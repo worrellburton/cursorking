@@ -2,7 +2,8 @@
 
 import { useEffect, useRef } from "react";
 
-const STAR_COUNT = 300;
+const STAR_COUNT = 500;
+const SHOOTING_STAR_CHANCE = 0.003;
 
 export default function SpaceBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -10,8 +11,9 @@ export default function SpaceBackground() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const gl = canvas.getContext("webgl2") || canvas.getContext("webgl");
-    if (!gl) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
     function resize() {
       if (!canvas) return;
@@ -21,113 +23,159 @@ export default function SpaceBackground() {
     resize();
     window.addEventListener("resize", resize);
 
-    // Generate star positions
-    const stars: { x: number; y: number; z: number; brightness: number }[] = [];
-    for (let i = 0; i < STAR_COUNT; i++) {
-      stars.push({
-        x: Math.random() * 2 - 1,
-        y: Math.random() * 2 - 1,
-        z: Math.random(),
-        brightness: 0.3 + Math.random() * 0.7,
-      });
-    }
+    // Stars
+    const stars = Array.from({ length: STAR_COUNT }, () => ({
+      x: Math.random(),
+      y: Math.random(),
+      z: Math.random(),
+      brightness: 0.3 + Math.random() * 0.7,
+      speed: 0.0001 + Math.random() * 0.0005,
+      twinkleSpeed: 1 + Math.random() * 4,
+      twinkleOffset: Math.random() * Math.PI * 2,
+      hue: 200 + Math.random() * 40, // blue-ish white range
+    }));
 
-    // Vertex shader
-    const vsSource = `
-      attribute vec2 a_position;
-      attribute float a_brightness;
-      attribute float a_size;
-      uniform vec2 u_resolution;
-      varying float v_brightness;
-      void main() {
-        gl_Position = vec4(a_position, 0.0, 1.0);
-        gl_PointSize = a_size;
-        v_brightness = a_brightness;
-      }
-    `;
+    // Shooting stars
+    type ShootingStar = {
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      life: number;
+      maxLife: number;
+    };
+    const shootingStars: ShootingStar[] = [];
 
-    // Fragment shader
-    const fsSource = `
-      precision mediump float;
-      varying float v_brightness;
-      void main() {
-        float dist = length(gl_PointCoord - vec2(0.5));
-        if (dist > 0.5) discard;
-        float alpha = smoothstep(0.5, 0.0, dist) * v_brightness;
-        gl_FragColor = vec4(0.8, 0.85, 1.0, alpha);
-      }
-    `;
-
-    function createShader(gl: WebGLRenderingContext, type: number, source: string) {
-      const shader = gl.createShader(type)!;
-      gl.shaderSource(shader, source);
-      gl.compileShader(shader);
-      return shader;
-    }
-
-    const vs = createShader(gl, gl.VERTEX_SHADER, vsSource);
-    const fs = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
-    const program = gl.createProgram()!;
-    gl.attachShader(program, vs);
-    gl.attachShader(program, fs);
-    gl.linkProgram(program);
-
-    const posLoc = gl.getAttribLocation(program, "a_position");
-    const brightLoc = gl.getAttribLocation(program, "a_brightness");
-    const sizeLoc = gl.getAttribLocation(program, "a_size");
-
-    const positions = new Float32Array(stars.length * 2);
-    const brightnesses = new Float32Array(stars.length);
-    const sizes = new Float32Array(stars.length);
+    // Nebula blobs
+    const nebulae = Array.from({ length: 4 }, () => ({
+      x: Math.random(),
+      y: Math.random(),
+      r: 0.1 + Math.random() * 0.15,
+      hue: Math.random() > 0.5 ? 200 : 280,
+      drift: 0.00005 + Math.random() * 0.0001,
+      phase: Math.random() * Math.PI * 2,
+    }));
 
     let animId: number;
     let time = 0;
 
     function draw() {
-      if (!gl || !canvas) return;
-      time += 0.005;
-      gl.viewport(0, 0, canvas.width, canvas.height);
-      gl.clearColor(0.02, 0.02, 0.05, 1.0);
-      gl.clear(gl.COLOR_BUFFER_BIT);
-      gl.enable(gl.BLEND);
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      if (!ctx || !canvas) return;
+      time += 0.016;
+      const W = canvas.width;
+      const H = canvas.height;
 
-      for (let i = 0; i < stars.length; i++) {
-        positions[i * 2] = stars[i].x;
-        positions[i * 2 + 1] = stars[i].y;
-        // Twinkling
-        brightnesses[i] =
-          stars[i].brightness *
-          (0.6 + 0.4 * Math.sin(time * (1 + stars[i].z * 3) + stars[i].x * 10));
-        sizes[i] = 1.0 + stars[i].z * 2.5;
+      // Dark space background
+      ctx.fillStyle = "#050510";
+      ctx.fillRect(0, 0, W, H);
+
+      // Nebula layers
+      for (const n of nebulae) {
+        const nx = (n.x + Math.sin(time * 0.1 + n.phase) * 0.02) * W;
+        const ny = (n.y + Math.cos(time * 0.08 + n.phase) * 0.02) * H;
+        const nr = n.r * Math.min(W, H);
+        const pulse = 0.8 + 0.2 * Math.sin(time * 0.3 + n.phase);
+
+        const grad = ctx.createRadialGradient(nx, ny, 0, nx, ny, nr);
+        grad.addColorStop(0, `hsla(${n.hue}, 70%, 50%, ${0.04 * pulse})`);
+        grad.addColorStop(0.5, `hsla(${n.hue}, 60%, 40%, ${0.02 * pulse})`);
+        grad.addColorStop(1, "transparent");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
       }
 
-      gl.useProgram(program);
+      // Stars
+      for (const star of stars) {
+        // Slow drift
+        star.y -= star.speed;
+        if (star.y < -0.01) {
+          star.y = 1.01;
+          star.x = Math.random();
+        }
 
-      const posBuf = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
-      gl.bufferData(gl.ARRAY_BUFFER, positions, gl.DYNAMIC_DRAW);
-      gl.enableVertexAttribArray(posLoc);
-      gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+        const twinkle = 0.4 + 0.6 * Math.sin(time * star.twinkleSpeed + star.twinkleOffset);
+        const alpha = star.brightness * twinkle;
+        const size = (0.5 + star.z * 2) * (0.8 + twinkle * 0.4);
+        const sx = star.x * W;
+        const sy = star.y * H;
 
-      const brightBuf = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, brightBuf);
-      gl.bufferData(gl.ARRAY_BUFFER, brightnesses, gl.DYNAMIC_DRAW);
-      gl.enableVertexAttribArray(brightLoc);
-      gl.vertexAttribPointer(brightLoc, 1, gl.FLOAT, false, 0, 0);
+        // Glow
+        if (star.z > 0.7) {
+          const glowR = size * 4;
+          const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, glowR);
+          glow.addColorStop(0, `hsla(${star.hue}, 30%, 90%, ${alpha * 0.3})`);
+          glow.addColorStop(1, "transparent");
+          ctx.fillStyle = glow;
+          ctx.beginPath();
+          ctx.arc(sx, sy, glowR, 0, Math.PI * 2);
+          ctx.fill();
+        }
 
-      const sizeBuf = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, sizeBuf);
-      gl.bufferData(gl.ARRAY_BUFFER, sizes, gl.DYNAMIC_DRAW);
-      gl.enableVertexAttribArray(sizeLoc);
-      gl.vertexAttribPointer(sizeLoc, 1, gl.FLOAT, false, 0, 0);
+        ctx.fillStyle = `hsla(${star.hue}, 20%, 95%, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(sx, sy, size, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
-      gl.drawArrays(gl.POINTS, 0, stars.length);
+      // Spawn shooting stars
+      if (Math.random() < SHOOTING_STAR_CHANCE) {
+        const angle = -Math.PI / 6 + Math.random() * -Math.PI / 6;
+        const speed = 4 + Math.random() * 4;
+        shootingStars.push({
+          x: Math.random() * W,
+          y: Math.random() * H * 0.4,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * -speed,
+          life: 0,
+          maxLife: 30 + Math.random() * 30,
+        });
+      }
 
-      // Clean up buffers
-      gl.deleteBuffer(posBuf);
-      gl.deleteBuffer(brightBuf);
-      gl.deleteBuffer(sizeBuf);
+      // Draw shooting stars
+      for (let i = shootingStars.length - 1; i >= 0; i--) {
+        const ss = shootingStars[i];
+        ss.x += ss.vx;
+        ss.y -= ss.vy;
+        ss.life++;
+
+        if (ss.life > ss.maxLife) {
+          shootingStars.splice(i, 1);
+          continue;
+        }
+
+        const progress = ss.life / ss.maxLife;
+        const alpha = progress < 0.3 ? progress / 0.3 : 1 - (progress - 0.3) / 0.7;
+        const tailLen = 40 + (1 - progress) * 40;
+
+        const grad = ctx.createLinearGradient(
+          ss.x, ss.y,
+          ss.x - ss.vx * tailLen / Math.sqrt(ss.vx * ss.vx + ss.vy * ss.vy),
+          ss.y + ss.vy * tailLen / Math.sqrt(ss.vx * ss.vx + ss.vy * ss.vy),
+        );
+        grad.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
+        grad.addColorStop(0.3, `rgba(200, 220, 255, ${alpha * 0.5})`);
+        grad.addColorStop(1, "transparent");
+
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(ss.x, ss.y);
+        const norm = Math.sqrt(ss.vx * ss.vx + ss.vy * ss.vy);
+        ctx.lineTo(
+          ss.x - (ss.vx / norm) * tailLen,
+          ss.y + (ss.vy / norm) * tailLen,
+        );
+        ctx.stroke();
+
+        // Head glow
+        const headGlow = ctx.createRadialGradient(ss.x, ss.y, 0, ss.x, ss.y, 6);
+        headGlow.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
+        headGlow.addColorStop(1, "transparent");
+        ctx.fillStyle = headGlow;
+        ctx.beginPath();
+        ctx.arc(ss.x, ss.y, 6, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       animId = requestAnimationFrame(draw);
     }

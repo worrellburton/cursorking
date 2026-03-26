@@ -1,8 +1,11 @@
 import { DurableObject } from "cloudflare:workers";
 
-const PADDLE_HEIGHT = 0.2; // 20% of screen height
-const BALL_SIZE = 0.012;
-const BALL_SPEED = 0.008;
+const PADDLE_HEIGHT = 0.14;
+const BALL_SIZE = 0.009;
+const BALL_SPEED = 0.007;
+const BALL_ACCEL = 1.02; // 2% faster each hit
+const WIN_SCORE = 3;
+const RESTART_DELAY = 3000;
 
 type GameState = {
   ball: { x: number; y: number; vx: number; vy: number };
@@ -12,11 +15,15 @@ type GameState = {
 
 export class PongRoom extends DurableObject {
   players: Map<WebSocket, "left" | "right"> = new Map();
+  names: Map<WebSocket, string> = new Map();
   spectators: Set<WebSocket> = new Set();
   allSockets: Set<WebSocket> = new Set();
+  // Track cursor positions for lobby display
+  cursors: Map<WebSocket, { x: number; y: number; name: string }> = new Map();
   state_: GameState;
   interval: ReturnType<typeof setInterval> | null = null;
   running = false;
+  winner: string | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -49,6 +56,13 @@ export class PongRoom extends DurableObject {
     };
   }
 
+  getNameForRole(role: "left" | "right"): string {
+    for (const [ws, r] of this.players) {
+      if (r === role) return this.names.get(ws) ?? "";
+    }
+    return "";
+  }
+
   assignRole(ws: WebSocket): "left" | "right" | "spectator" {
     const roles = new Set(this.players.values());
     if (!roles.has("left")) {
@@ -65,9 +79,23 @@ export class PongRoom extends DurableObject {
 
   startGame() {
     if (this.running) return;
-    this.running = true;
-    this.state_ = { ...this.freshState(), score: this.state_.score };
-    this.interval = setInterval(() => this.tick(), 1000 / 60);
+    this.winner = null;
+    this.state_ = { ...this.freshState(), score: { left: 0, right: 0 } };
+    this.broadcastState();
+
+    // 3-2-1 countdown
+    this.broadcast(JSON.stringify({ type: "countdown", value: 3 }));
+    setTimeout(() => {
+      this.broadcast(JSON.stringify({ type: "countdown", value: 2 }));
+    }, 1000);
+    setTimeout(() => {
+      this.broadcast(JSON.stringify({ type: "countdown", value: 1 }));
+    }, 2000);
+    setTimeout(() => {
+      this.broadcast(JSON.stringify({ type: "countdown", value: 0 }));
+      this.running = true;
+      this.interval = setInterval(() => this.tick(), 1000 / 60);
+    }, 3000);
   }
 
   stopGame() {
@@ -79,12 +107,13 @@ export class PongRoom extends DurableObject {
   }
 
   tick() {
+    if (this.winner) return;
+
     const { ball, paddles } = this.state_;
 
     ball.x += ball.vx;
     ball.y += ball.vy;
 
-    // Top/bottom bounce (normalized 0-1)
     if (ball.y - BALL_SIZE <= 0) {
       ball.y = BALL_SIZE;
       ball.vy = Math.abs(ball.vy);
@@ -94,7 +123,6 @@ export class PongRoom extends DurableObject {
       ball.vy = -Math.abs(ball.vy);
     }
 
-    // Left paddle collision (at ~4% from left edge)
     const leftPaddleX = 0.04 + 0.018;
     if (
       ball.x - BALL_SIZE <= leftPaddleX &&
@@ -105,12 +133,11 @@ export class PongRoom extends DurableObject {
       ball.x = leftPaddleX + BALL_SIZE;
       const hitPos = (ball.y - paddles.left) / (PADDLE_HEIGHT / 2);
       const angle = hitPos * (Math.PI / 4);
-      const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) + 0.0003;
+      const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * BALL_ACCEL;
       ball.vx = Math.abs(speed * Math.cos(angle));
       ball.vy = speed * Math.sin(angle);
     }
 
-    // Right paddle collision (at ~4% from right edge)
     const rightPaddleX = 1 - 0.04 - 0.018;
     if (
       ball.x + BALL_SIZE >= rightPaddleX &&
@@ -121,22 +148,46 @@ export class PongRoom extends DurableObject {
       ball.x = rightPaddleX - BALL_SIZE;
       const hitPos = (ball.y - paddles.right) / (PADDLE_HEIGHT / 2);
       const angle = hitPos * (Math.PI / 4);
-      const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) + 0.0003;
+      const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * BALL_ACCEL;
       ball.vx = -Math.abs(speed * Math.cos(angle));
       ball.vy = speed * Math.sin(angle);
     }
 
-    // Scoring
     if (ball.x < 0) {
       this.state_.score.right++;
+      if (this.state_.score.right >= WIN_SCORE) {
+        this.winner = this.getNameForRole("right") || "RED";
+        this.broadcastState();
+        this.scheduleRestart();
+        return;
+      }
       this.resetBall("right");
     }
     if (ball.x > 1) {
       this.state_.score.left++;
+      if (this.state_.score.left >= WIN_SCORE) {
+        this.winner = this.getNameForRole("left") || "CYAN";
+        this.broadcastState();
+        this.scheduleRestart();
+        return;
+      }
       this.resetBall("left");
     }
 
     this.broadcastState();
+  }
+
+  scheduleRestart() {
+    setTimeout(() => {
+      this.winner = null;
+      this.state_ = this.freshState();
+      if (this.players.size === 2) {
+        this.startGame();
+      } else {
+        this.stopGame();
+        this.broadcastState();
+      }
+    }, RESTART_DELAY);
   }
 
   broadcast(msg: string) {
@@ -157,6 +208,11 @@ export class PongRoom extends DurableObject {
           ball: { x: this.state_.ball.x, y: this.state_.ball.y },
           paddles: this.state_.paddles,
           score: this.state_.score,
+          names: {
+            left: this.getNameForRole("left"),
+            right: this.getNameForRole("right"),
+          },
+          winner: this.winner,
         },
       })
     );
@@ -166,6 +222,11 @@ export class PongRoom extends DurableObject {
     this.broadcast(
       JSON.stringify({ type: "player-count", count: this.allSockets.size })
     );
+  }
+
+  broadcastCursors() {
+    const cursorsArr = [...this.cursors.entries()].map(([, data]) => data);
+    this.broadcast(JSON.stringify({ type: "cursors", cursors: cursorsArr }));
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -189,13 +250,18 @@ export class PongRoom extends DurableObject {
           ball: { x: this.state_.ball.x, y: this.state_.ball.y },
           paddles: this.state_.paddles,
           score: this.state_.score,
+          names: {
+            left: this.getNameForRole("left"),
+            right: this.getNameForRole("right"),
+          },
+          winner: this.winner,
         },
       })
     );
 
     this.broadcastPlayerCount();
 
-    if (this.players.size === 2 && !this.running) {
+    if (this.players.size === 2 && !this.running && !this.winner) {
       this.startGame();
     }
 
@@ -205,6 +271,20 @@ export class PongRoom extends DurableObject {
   webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
     if (typeof message !== "string") return;
     const data = JSON.parse(message);
+
+    if (data.type === "set-name") {
+      this.names.set(ws, String(data.name).slice(0, 12));
+      this.broadcastState();
+      return;
+    }
+
+    if (data.type === "cursor-move") {
+      const name = this.names.get(ws) ?? "";
+      this.cursors.set(ws, { x: data.x, y: data.y, name });
+      this.broadcastCursors();
+      return;
+    }
+
     const role = this.players.get(ws);
     if (!role) return;
 
@@ -215,7 +295,6 @@ export class PongRoom extends DurableObject {
       );
       this.state_.paddles[role] = y;
 
-      // Broadcast paddle state even before game starts
       if (!this.running) {
         this.broadcastState();
       }
@@ -225,8 +304,10 @@ export class PongRoom extends DurableObject {
   webSocketClose(ws: WebSocket) {
     const role = this.players.get(ws);
     this.players.delete(ws);
+    this.names.delete(ws);
     this.spectators.delete(ws);
     this.allSockets.delete(ws);
+    this.cursors.delete(ws);
 
     if (role) {
       const next = [...this.spectators][0];
@@ -240,6 +321,7 @@ export class PongRoom extends DurableObject {
     }
 
     this.broadcastPlayerCount();
+    this.broadcastCursors();
   }
 
   webSocketError(ws: WebSocket) {
