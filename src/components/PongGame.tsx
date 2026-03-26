@@ -249,18 +249,7 @@ export default function PongGame({ playerName }: { playerName: string }) {
       ctx.fill();
       ctx.restore();
 
-      // Left paddle name
-      if (state.names.left) {
-        ctx.save();
-        const labelSize = Math.max(10, Math.floor(H * 0.016));
-        ctx.font = `bold ${labelSize}px 'Courier New', monospace`;
-        ctx.fillStyle = "#22d3ee";
-        ctx.shadowColor = "#22d3ee";
-        ctx.shadowBlur = 8;
-        ctx.textAlign = "center";
-        ctx.fillText(state.names.left.toUpperCase(), paddleLeftX, ly - 8);
-        ctx.restore();
-      }
+      // Left paddle name — removed (now shown next to cursor)
 
       // Right paddle
       ctx.save();
@@ -274,18 +263,7 @@ export default function PongGame({ playerName }: { playerName: string }) {
       ctx.fill();
       ctx.restore();
 
-      // Right paddle name
-      if (state.names.right) {
-        ctx.save();
-        const labelSize = Math.max(10, Math.floor(H * 0.016));
-        ctx.font = `bold ${labelSize}px 'Courier New', monospace`;
-        ctx.fillStyle = "#f43f5e";
-        ctx.shadowColor = "#f43f5e";
-        ctx.shadowBlur = 8;
-        ctx.textAlign = "center";
-        ctx.fillText(state.names.right.toUpperCase(), paddleRightX, ry - 8);
-        ctx.restore();
-      }
+      // Right paddle name — removed (now shown next to cursor)
 
       // Compute ball speed for glow scaling
       const prev = prevBallRef.current;
@@ -377,6 +355,19 @@ export default function PongGame({ playerName }: { playerName: string }) {
       ctx.strokeStyle = "rgba(0,0,0,0.5)";
       ctx.lineWidth = 0.5;
       ctx.stroke();
+
+      // Player name label next to cursor
+      const myName = role === "left" ? state.names.left : role === "right" ? state.names.right : "";
+      if (myName) {
+        const labelSize = Math.max(11, Math.floor(H * 0.018));
+        ctx.font = `bold ${labelSize}px 'Courier New', monospace`;
+        ctx.textAlign = "left";
+        const nameColor = role === "left" ? "#22d3ee" : "#f43f5e";
+        ctx.fillStyle = nameColor;
+        ctx.shadowColor = nameColor;
+        ctx.shadowBlur = 8;
+        ctx.fillText(myName.toUpperCase(), 18, 28);
+      }
       ctx.restore();
 
       // Waiting for player message
