@@ -1,11 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import SpaceBackground from "@/components/SpaceBackground";
 import PongGame from "@/components/PongGame";
 
 export default function Home() {
   const [started, setStarted] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const handleStart = () => {
+    const audio = new Audio(`${process.env.NODE_ENV === "production" ? "/cursorking" : ""}/menu.mp3`);
+    audio.volume = 0.5;
+    audio.play().catch(() => {});
+    audioRef.current = audio;
+    setStarted(true);
+  };
 
   return (
     <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden">
@@ -33,7 +42,7 @@ export default function Home() {
             </span>
           </h1>
           <button
-            onClick={() => setStarted(true)}
+            onClick={handleStart}
             className="tracking-widest"
             style={{
               fontFamily: "'Courier New', Courier, monospace",
