@@ -11,6 +11,7 @@ export default function Home() {
   const [playerName, setPlayerName] = useState("");
   const [screen, setScreen] = useState<Screen>("name");
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [mobilePlayerCount, setMobilePlayerCount] = useState(0);
 
   useEffect(() => {
     const isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(
@@ -18,6 +19,24 @@ export default function Home() {
     ) || (window.matchMedia("(pointer: coarse)").matches && window.innerWidth < 1024);
     if (isMobile) setScreen("mobile");
   }, []);
+
+  // Connect to WS on mobile to get player count
+  useEffect(() => {
+    if (screen !== "mobile") return;
+    const wsUrl = process.env.NEXT_PUBLIC_WS_URL ?? "wss://cursorking-pong.worrellburton.workers.dev";
+    let ws: WebSocket;
+    function connect() {
+      ws = new WebSocket(wsUrl);
+      ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        if (msg.type === "player-count") setMobilePlayerCount(msg.count);
+      };
+      ws.onclose = () => setTimeout(connect, 3000);
+      ws.onerror = () => ws.close();
+    }
+    connect();
+    return () => ws?.close();
+  }, [screen]);
 
   const handleNameSubmit = () => {
     if (!playerName.trim()) return;
@@ -149,6 +168,44 @@ export default function Home() {
           >
             PLEASE VISIT ON A DESKTOP BROWSER
           </p>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              marginTop: "24px",
+              fontFamily: "'Courier New', monospace",
+              background: "rgba(0, 0, 0, 0.4)",
+              backdropFilter: "blur(8px)",
+              border: "1px solid rgba(34, 197, 94, 0.2)",
+              borderRadius: "9999px",
+              padding: "10px 20px",
+            }}
+          >
+            <span
+              style={{
+                display: "inline-block",
+                width: "10px",
+                height: "10px",
+                borderRadius: "50%",
+                background: "#22c55e",
+                boxShadow: "0 0 8px #22c55e, 0 0 16px rgba(34, 197, 94, 0.5)",
+              }}
+            />
+            <span
+              style={{
+                fontSize: "0.9rem",
+                fontWeight: "bold",
+                color: "#22c55e",
+                textShadow: "0 0 10px rgba(34, 197, 94, 0.8)",
+              }}
+            >
+              {mobilePlayerCount}
+            </span>
+            <span style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.4)" }}>
+              GLOBAL PLAYERS
+            </span>
+          </div>
         </div>
       )}
 
