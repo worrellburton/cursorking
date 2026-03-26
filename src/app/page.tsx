@@ -91,43 +91,52 @@ export default function Home() {
       {screen === "start" && <MenuCursor name={playerName} />}
 
       {screen === "name" && (
-        <div className="relative z-10 flex flex-col items-center gap-4 text-center px-4">
-          <label
+        <div className="relative z-10 flex items-center justify-center px-4">
+          <div
             style={{
-              fontFamily: "'Courier New', Courier, monospace",
-              fontSize: "0.85rem",
-              color: "rgba(255, 255, 255, 0.4)",
-              letterSpacing: "0.2em",
-              textTransform: "uppercase",
+              display: "flex",
+              alignItems: "center",
+              background: "rgba(255, 255, 255, 0.12)",
+              border: "2px solid rgba(255, 255, 255, 0.5)",
+              borderRadius: "9999px",
+              padding: "12px 32px",
+              backdropFilter: "blur(8px)",
             }}
           >
-            PLAYER
-          </label>
-          <input
-            type="text"
-            value={playerName}
-            onChange={(e) => setPlayerName(e.target.value.slice(0, 12))}
-            onKeyDown={(e) => e.key === "Enter" && handleNameSubmit()}
-            placeholder=""
-            maxLength={12}
-            autoFocus
-            style={{
-              fontFamily: "'Courier New', Courier, monospace",
-              fontSize: "2rem",
-              fontWeight: "bold",
-              color: "#22d3ee",
-              border: "none",
-              borderBottom: "2px solid rgba(34, 211, 238, 0.4)",
-              borderRadius: "0",
-              padding: "8px 4px",
-              background: "transparent",
-              outline: "none",
-              textAlign: "center",
-              width: "320px",
-              textShadow: "0 0 15px rgba(34, 211, 238, 0.6)",
-              caretColor: "#22d3ee",
-            }}
-          />
+            <span
+              style={{
+                fontFamily: "'Courier New', Courier, monospace",
+                fontSize: "0.85rem",
+                color: "rgba(255, 255, 255, 0.5)",
+                letterSpacing: "0.15em",
+                marginRight: "12px",
+                whiteSpace: "nowrap",
+              }}
+            >
+              PLAYER NAME
+            </span>
+            <input
+              type="text"
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value.slice(0, 12))}
+              onKeyDown={(e) => e.key === "Enter" && handleNameSubmit()}
+              placeholder=""
+              maxLength={12}
+              autoFocus
+              style={{
+                fontFamily: "'Courier New', Courier, monospace",
+                fontSize: "1.2rem",
+                fontWeight: "bold",
+                color: "#ffffff",
+                border: "none",
+                padding: "4px 0",
+                background: "transparent",
+                outline: "none",
+                width: "180px",
+                caretColor: "#ffffff",
+              }}
+            />
+          </div>
         </div>
       )}
 
