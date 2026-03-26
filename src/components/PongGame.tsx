@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import usePartySocket from "partysocket/react";
 
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 500;
@@ -10,23 +9,22 @@ const PADDLE_HEIGHT = 80;
 const PADDLE_OFFSET = 20;
 const BALL_SIZE = 10;
 
-const PARTYKIT_HOST =
-  process.env.NEXT_PUBLIC_PARTYKIT_HOST ?? "127.0.0.1:1999";
+const WS_URL =
+  process.env.NEXT_PUBLIC_WS_URL ?? "wss://cursorking-pong.worrellburton.workers.dev";
 
 type GameState = {
   ball: { x: number; y: number };
   paddles: { left: number; right: number };
   score: { left: number; right: number };
-  players: { left: string | null; right: string | null };
 };
 
 export default function PongGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
   const [gameState, setGameState] = useState<GameState>({
     ball: { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 },
     paddles: { left: CANVAS_HEIGHT / 2, right: CANVAS_HEIGHT / 2 },
     score: { left: 0, right: 0 },
-    players: { left: null, right: null },
   });
   const [myRole, setMyRole] = useState<"left" | "right" | "spectator">("spectator");
   const [playerCount, setPlayerCount] = useState(0);
@@ -36,58 +34,75 @@ export default function PongGame() {
   gameStateRef.current = gameState;
   myRoleRef.current = myRole;
 
-  const ws = usePartySocket({
-    host: PARTYKIT_HOST,
-    party: "pong",
-    room: "main",
-    onMessage(event) {
-      const msg = JSON.parse(event.data);
+  // WebSocket connection
+  useEffect(() => {
+    function connect() {
+      const ws = new WebSocket(WS_URL);
 
-      if (msg.type === "game-state") {
-        setGameState(msg.state);
-      }
-      if (msg.type === "role") {
-        setMyRole(msg.role);
-      }
-      if (msg.type === "player-count") {
-        setPlayerCount(msg.count);
-      }
-    },
-  });
+      ws.onopen = () => {
+        wsRef.current = ws;
+      };
 
-  const handlePointerMove = useCallback(
-    (e: PointerEvent) => {
-      const role = myRoleRef.current;
-      if (role === "spectator") return;
+      ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        if (msg.type === "game-state") {
+          setGameState(msg.state);
+        }
+        if (msg.type === "role") {
+          setMyRole(msg.role);
+        }
+        if (msg.type === "player-count") {
+          setPlayerCount(msg.count);
+        }
+      };
 
-      const canvas = canvasRef.current;
-      if (!canvas) return;
+      ws.onclose = () => {
+        wsRef.current = null;
+        // Reconnect after 1s
+        setTimeout(connect, 1000);
+      };
 
-      const rect = canvas.getBoundingClientRect();
+      ws.onerror = () => {
+        ws.close();
+      };
+    }
 
-      // Check if cursor is within the player's 40% zone
-      const relX = e.clientX - rect.left;
-      const canvasDisplayWidth = rect.width;
+    connect();
+    return () => {
+      wsRef.current?.close();
+    };
+  }, []);
 
-      if (role === "left" && relX > canvasDisplayWidth * 0.4) return;
-      if (role === "right" && relX < canvasDisplayWidth * 0.6) return;
+  const handlePointerMove = useCallback((e: PointerEvent) => {
+    const role = myRoleRef.current;
+    if (role === "spectator") return;
 
-      // Throttle to ~60fps
-      const now = Date.now();
-      if (now - lastSentRef.current < 16) return;
-      lastSentRef.current = now;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-      const scaleY = CANVAS_HEIGHT / rect.height;
-      const y = (e.clientY - rect.top) * scaleY;
-      const clampedY = Math.max(
-        PADDLE_HEIGHT / 2,
-        Math.min(CANVAS_HEIGHT - PADDLE_HEIGHT / 2, y)
-      );
+    const rect = canvas.getBoundingClientRect();
 
-      ws.send(JSON.stringify({ type: "paddle-move", y: clampedY }));
-    },
-    [ws]
-  );
+    // Check if cursor is within the player's 40% zone
+    const relX = e.clientX - rect.left;
+    const canvasDisplayWidth = rect.width;
+
+    if (role === "left" && relX > canvasDisplayWidth * 0.4) return;
+    if (role === "right" && relX < canvasDisplayWidth * 0.6) return;
+
+    // Throttle to ~60fps
+    const now = Date.now();
+    if (now - lastSentRef.current < 16) return;
+    lastSentRef.current = now;
+
+    const scaleY = CANVAS_HEIGHT / rect.height;
+    const y = (e.clientY - rect.top) * scaleY;
+    const clampedY = Math.max(
+      PADDLE_HEIGHT / 2,
+      Math.min(CANVAS_HEIGHT - PADDLE_HEIGHT / 2, y)
+    );
+
+    wsRef.current?.send(JSON.stringify({ type: "paddle-move", y: clampedY }));
+  }, []);
 
   useEffect(() => {
     window.addEventListener("pointermove", handlePointerMove);
