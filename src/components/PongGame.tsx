@@ -4,8 +4,14 @@ import { useEffect, useRef, useState, useCallback } from "react";
 
 const PADDLE_WIDTH = 10;
 const PADDLE_HEIGHT = 70;
-const PADDLE_OFFSET = 24;
 const BALL_SIZE = 7;
+
+// Paddle X clamp ranges (must match server)
+const LEFT_X_MIN = 0.02;
+const LEFT_X_MAX = 0.45;
+const RIGHT_X_MIN = 0.55;
+const RIGHT_X_MAX = 0.98;
+const PADDLE_H_NORM = 0.14;
 
 const WS_URL =
   process.env.NEXT_PUBLIC_WS_URL ?? "wss://cursorking-pong.worrellburton.workers.dev";
@@ -25,30 +31,34 @@ type BallTrail = { x: number; y: number; age: number };
 export default function PongGame({ playerName }: { playerName: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
-  const [gameState, setGameState] = useState<GameState>({
+
+  // All game state lives in refs — zero React re-renders during gameplay
+  const gameStateRef = useRef<GameState>({
     ball: { x: 0.5, y: 0.5 },
     paddles: { left: { x: 0.04, y: 0.5 }, right: { x: 0.96, y: 0.5 } },
     score: { left: 0, right: 0 },
     names: { left: "", right: "" },
     winner: null,
   });
-  const [myRole, setMyRole] = useState<"left" | "right" | "spectator">("spectator");
-  const [playerCount, setPlayerCount] = useState(0);
-  const [countdown, setCountdown] = useState<number | null>(null);
-  const gameStateRef = useRef(gameState);
-  const myRoleRef = useRef(myRole);
-  const countdownRef = useRef(countdown);
+  const myRoleRef = useRef<"left" | "right" | "spectator">("spectator");
+  const countdownRef = useRef<number | null>(null);
   const lastSentRef = useRef(0);
   const mouseRef = useRef({ x: 0, y: 0 });
   const ballTrailRef = useRef<BallTrail[]>([]);
   const prevBallRef = useRef({ x: 0.5, y: 0.5 });
   const ballSpeedRef = useRef(0);
   const canvasSizeRef = useRef({ w: 800, h: 500 });
-  const playerCountRef = useRef(playerCount);
-  gameStateRef.current = gameState;
-  myRoleRef.current = myRole;
-  countdownRef.current = countdown;
-  playerCountRef.current = playerCount;
+  const playerCountRef = useRef(0);
+
+  // Ball interpolation refs
+  const serverBallRef = useRef({ x: 0.5, y: 0.5 });
+  const serverBallPrevRef = useRef({ x: 0.5, y: 0.5 });
+  const serverBallTimeRef = useRef(0);
+  const serverBallDtRef = useRef(16.67); // estimated server tick interval in ms
+  const interpBallRef = useRef({ x: 0.5, y: 0.5 });
+
+  // Only playerCount triggers React re-render (for the HUD text)
+  const [playerCount, setPlayerCount] = useState(0);
 
   useEffect(() => {
     function connect() {
@@ -62,16 +72,37 @@ export default function PongGame({ playerName }: { playerName: string }) {
       ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
         if (msg.type === "game-state") {
-          setGameState(msg.state);
+          const state = msg.state as GameState;
+
+          // Ball interpolation: store previous and new server ball positions
+          const now = performance.now();
+          const dt = now - serverBallTimeRef.current;
+          if (dt > 0 && dt < 200) {
+            // Smooth the estimated tick interval
+            serverBallDtRef.current = serverBallDtRef.current * 0.8 + dt * 0.2;
+          }
+          serverBallPrevRef.current = { ...serverBallRef.current };
+          serverBallRef.current = { x: state.ball.x, y: state.ball.y };
+          serverBallTimeRef.current = now;
+
+          // Client-side prediction: keep our own paddle position, use server for opponent
+          const role = myRoleRef.current;
+          if (role === "left" || role === "right") {
+            const myPaddle = gameStateRef.current.paddles[role];
+            state.paddles[role] = myPaddle; // keep local prediction
+          }
+
+          gameStateRef.current = state;
         }
         if (msg.type === "role") {
-          setMyRole(msg.role);
+          myRoleRef.current = msg.role;
         }
         if (msg.type === "player-count") {
+          playerCountRef.current = msg.count;
           setPlayerCount(msg.count);
         }
         if (msg.type === "countdown") {
-          setCountdown(msg.value > 0 ? msg.value : null);
+          countdownRef.current = msg.value > 0 ? msg.value : null;
         }
       };
 
@@ -97,13 +128,24 @@ export default function PongGame({ playerName }: { playerName: string }) {
     if (role === "spectator") return;
 
     const { w, h } = canvasSizeRef.current;
+    const normalizedX = Math.max(0, Math.min(1, e.clientX / w));
+    const normalizedY = Math.max(0, Math.min(1, e.clientY / h));
 
+    // Client-side prediction: apply paddle position IMMEDIATELY
+    let clampedX: number;
+    if (role === "left") {
+      clampedX = Math.max(LEFT_X_MIN, Math.min(LEFT_X_MAX, normalizedX));
+    } else {
+      clampedX = Math.max(RIGHT_X_MIN, Math.min(RIGHT_X_MAX, normalizedX));
+    }
+    const clampedY = Math.max(PADDLE_H_NORM / 2, Math.min(1 - PADDLE_H_NORM / 2, normalizedY));
+    gameStateRef.current.paddles[role] = { x: clampedX, y: clampedY };
+
+    // Throttle network sends to ~60fps
     const now = Date.now();
     if (now - lastSentRef.current < 16) return;
     lastSentRef.current = now;
 
-    const normalizedX = Math.max(0, Math.min(1, e.clientX / w));
-    const normalizedY = Math.max(0, Math.min(1, e.clientY / h));
     wsRef.current?.send(JSON.stringify({ type: "paddle-move", x: normalizedX, y: normalizedY }));
   }, []);
 
@@ -139,8 +181,22 @@ export default function PongGame({ playerName }: { playerName: string }) {
       const W = canvas.width;
       const H = canvas.height;
 
-      const ballX = state.ball.x * W;
-      const ballY = state.ball.y * H;
+      // Interpolate ball position between server ticks for ultra-smooth movement
+      const now = performance.now();
+      const elapsed = now - serverBallTimeRef.current;
+      const t = Math.min(1, elapsed / serverBallDtRef.current);
+      const prevB = serverBallPrevRef.current;
+      const nextB = serverBallRef.current;
+      interpBallRef.current = {
+        x: prevB.x + (nextB.x - prevB.x) * t,
+        y: prevB.y + (nextB.y - prevB.y) * t,
+      };
+
+      // Use interpolated ball if game is running, otherwise use server position directly
+      const activeBall = state.winner ? state.ball : interpBallRef.current;
+      const ballX = activeBall.x * W;
+      const ballY = activeBall.y * H;
+
       const paddleLeftX = state.paddles.left.x * W;
       const paddleLeftY = state.paddles.left.y * H;
       const paddleRightX = state.paddles.right.x * W;
@@ -249,20 +305,20 @@ export default function PongGame({ playerName }: { playerName: string }) {
 
       for (let i = 0; i < trail.length; i++) {
         trail[i].age++;
-        const t = trail[i];
-        const life = 1 - t.age / 25;
+        const tt = trail[i];
+        const life = 1 - tt.age / 25;
         if (life <= 0) continue;
 
         const r = ballR * life * 0.8;
         const trailGlowR = r * (2.5 + speedFactor);
-        const grad = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, trailGlowR);
+        const grad = ctx.createRadialGradient(tt.x, tt.y, 0, tt.x, tt.y, trailGlowR);
         grad.addColorStop(0, `rgba(255, 200, 50, ${life * 0.4 * speedFactor})`);
         grad.addColorStop(0.3, `rgba(255, 100, 20, ${life * 0.3 * speedFactor})`);
         grad.addColorStop(0.7, `rgba(200, 30, 0, ${life * 0.1 * speedFactor})`);
         grad.addColorStop(1, "rgba(100, 0, 0, 0)");
         ctx.fillStyle = grad;
         ctx.beginPath();
-        ctx.arc(t.x, t.y, trailGlowR, 0, Math.PI * 2);
+        ctx.arc(tt.x, tt.y, trailGlowR, 0, Math.PI * 2);
         ctx.fill();
       }
 

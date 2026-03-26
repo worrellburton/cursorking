@@ -14,14 +14,14 @@ export default function Home() {
 
   const handleNameSubmit = () => {
     if (!playerName.trim()) return;
-    const audio = new Audio(`${process.env.NODE_ENV === "production" ? "/cursorking" : ""}/menu.mp3`);
-    audio.volume = 0.5;
-    audio.play().catch(() => {});
-    audioRef.current = audio;
     setScreen("start");
   };
 
   const handleStart = () => {
+    const audio = new Audio(`${process.env.NODE_ENV === "production" ? "/cursorking" : ""}/menu.mp3`);
+    audio.volume = 0.5;
+    audio.play().catch(() => {});
+    audioRef.current = audio;
     setScreen("game");
   };
 
