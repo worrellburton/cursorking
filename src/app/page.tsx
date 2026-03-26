@@ -213,7 +213,7 @@ export default function Home() {
           >
             CURSOR<span style={{ color: "#22d3ee" }}>KING</span>
           </div>
-          <PongGame playerName={playerName} />
+          <PongGame playerName={playerName} isMobile={isMobile} />
         </>
       )}
       <style jsx>{`

@@ -33,7 +33,18 @@ type GameState = {
 
 type BallTrail = { x: number; y: number; age: number };
 
-export default function PongGame({ playerName }: { playerName: string }) {
+// Transform server coords (horizontal) to screen coords for mobile (vertical)
+function serverToScreen(sx: number, sy: number, role: "left" | "right"): { x: number; y: number } {
+  if (role === "left") return { x: sy, y: 1 - sx };
+  return { x: 1 - sy, y: sx };
+}
+
+function screenToServer(screenX: number, screenY: number, role: "left" | "right"): { x: number; y: number } {
+  if (role === "left") return { x: 1 - screenY, y: screenX };
+  return { x: screenY, y: 1 - screenX };
+}
+
+export default function PongGame({ playerName, isMobile = false }: { playerName: string; isMobile?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -152,23 +163,33 @@ export default function PongGame({ playerName }: { playerName: string }) {
     };
   }, [playerName]);
 
-  const handlePointerMove = useCallback((e: PointerEvent) => {
-    mouseRef.current = { x: e.clientX, y: e.clientY };
+  const sendPaddleFromScreen = useCallback((clientX: number, clientY: number) => {
     const role = myRoleRef.current;
     if (role === "spectator") return;
 
     const { w, h } = canvasSizeRef.current;
-    const normalizedX = Math.max(0, Math.min(1, e.clientX / w));
-    const normalizedY = Math.max(0, Math.min(1, e.clientY / h));
+    const screenNX = Math.max(0, Math.min(1, clientX / w));
+    const screenNY = Math.max(0, Math.min(1, clientY / h));
 
-    // Client-side prediction: apply paddle position IMMEDIATELY
+    // Convert screen coords to server coords on mobile
+    let serverX: number, serverY: number;
+    if (isMobile) {
+      const s = screenToServer(screenNX, screenNY, role);
+      serverX = s.x;
+      serverY = s.y;
+    } else {
+      serverX = screenNX;
+      serverY = screenNY;
+    }
+
+    // Client-side prediction
     let clampedX: number;
     if (role === "left") {
-      clampedX = Math.max(LEFT_X_MIN, Math.min(LEFT_X_MAX, normalizedX));
+      clampedX = Math.max(LEFT_X_MIN, Math.min(LEFT_X_MAX, serverX));
     } else {
-      clampedX = Math.max(RIGHT_X_MIN, Math.min(RIGHT_X_MAX, normalizedX));
+      clampedX = Math.max(RIGHT_X_MIN, Math.min(RIGHT_X_MAX, serverX));
     }
-    const clampedY = Math.max(PADDLE_H_NORM / 2, Math.min(1 - PADDLE_H_NORM / 2, normalizedY));
+    const clampedY = Math.max(PADDLE_H_NORM / 2, Math.min(1 - PADDLE_H_NORM / 2, serverY));
     gameStateRef.current.paddles[role] = { x: clampedX, y: clampedY };
 
     // Throttle network sends to ~60fps
@@ -176,8 +197,13 @@ export default function PongGame({ playerName }: { playerName: string }) {
     if (now - lastSentRef.current < 16) return;
     lastSentRef.current = now;
 
-    wsRef.current?.send(JSON.stringify({ type: "paddle-move", x: normalizedX, y: normalizedY }));
-  }, []);
+    wsRef.current?.send(JSON.stringify({ type: "paddle-move", x: serverX, y: serverY }));
+  }, [isMobile]);
+
+  const handlePointerMove = useCallback((e: PointerEvent) => {
+    mouseRef.current = { x: e.clientX, y: e.clientY };
+    sendPaddleFromScreen(e.clientX, e.clientY);
+  }, [sendPaddleFromScreen]);
 
   // Click handler: grab pickup or fire bullet
   const handleClick = useCallback(() => {
@@ -191,8 +217,16 @@ export default function PongGame({ playerName }: { playerName: string }) {
       const mouse = mouseRef.current;
       const mx = mouse.x / w;
       const my = mouse.y / h;
-      const dx = mx - state.pickup.x;
-      const dy = my - state.pickup.y;
+      // On mobile, convert pickup position to screen coords for distance check
+      let pickupScreenX = state.pickup.x;
+      let pickupScreenY = state.pickup.y;
+      if (isMobile && (role === "left" || role === "right")) {
+        const ps = serverToScreen(state.pickup.x, state.pickup.y, role);
+        pickupScreenX = ps.x;
+        pickupScreenY = ps.y;
+      }
+      const dx = mx - pickupScreenX;
+      const dy = my - pickupScreenY;
       if (Math.sqrt(dx * dx + dy * dy) < 0.12) {
         wsRef.current?.send(JSON.stringify({ type: "grab-pickup" }));
         return;
@@ -211,27 +245,8 @@ export default function PongGame({ playerName }: { playerName: string }) {
     const touch = e.touches[0];
     if (!touch) return;
     mouseRef.current = { x: touch.clientX, y: touch.clientY };
-    const role = myRoleRef.current;
-    if (role === "spectator") return;
-
-    const { w, h } = canvasSizeRef.current;
-    const normalizedX = Math.max(0, Math.min(1, touch.clientX / w));
-    const normalizedY = Math.max(0, Math.min(1, touch.clientY / h));
-
-    let clampedX: number;
-    if (role === "left") {
-      clampedX = Math.max(LEFT_X_MIN, Math.min(LEFT_X_MAX, normalizedX));
-    } else {
-      clampedX = Math.max(RIGHT_X_MIN, Math.min(RIGHT_X_MAX, normalizedX));
-    }
-    const clampedY = Math.max(PADDLE_H_NORM / 2, Math.min(1 - PADDLE_H_NORM / 2, normalizedY));
-    gameStateRef.current.paddles[role] = { x: clampedX, y: clampedY };
-
-    const now = Date.now();
-    if (now - lastSentRef.current < 16) return;
-    lastSentRef.current = now;
-    wsRef.current?.send(JSON.stringify({ type: "paddle-move", x: normalizedX, y: normalizedY }));
-  }, []);
+    sendPaddleFromScreen(touch.clientX, touch.clientY);
+  }, [sendPaddleFromScreen]);
 
   const handleTouchStart = useCallback((e: TouchEvent) => {
     e.preventDefault();
@@ -279,6 +294,16 @@ export default function PongGame({ playerName }: { playerName: string }) {
       const count = playerCountRef.current;
       const W = canvas.width;
       const H = canvas.height;
+      const mob = isMobile;
+
+      // Helper: transform server normalized coords to screen pixels
+      function toScreen(sx: number, sy: number): { x: number; y: number } {
+        if (mob && (role === "left" || role === "right")) {
+          const s = serverToScreen(sx, sy, role);
+          return { x: s.x * W, y: s.y * H };
+        }
+        return { x: sx * W, y: sy * H };
+      }
 
       // Interpolate ball
       const now = performance.now();
@@ -292,16 +317,31 @@ export default function PongGame({ playerName }: { playerName: string }) {
       };
 
       const activeBall = state.winner ? state.ball : interpBallRef.current;
-      const ballX = activeBall.x * W;
-      const ballY = activeBall.y * H;
+      const ballScreen = toScreen(activeBall.x, activeBall.y);
+      const ballX = ballScreen.x;
+      const ballY = ballScreen.y;
 
-      const paddleLeftX = state.paddles.left.x * W;
-      const paddleLeftY = state.paddles.left.y * H;
-      const paddleRightX = state.paddles.right.x * W;
-      const paddleRightY = state.paddles.right.y * H;
-      const paddleH = PADDLE_HEIGHT * (H / 500);
-      const paddleW = PADDLE_WIDTH * (W / 800);
+      const lpScreen = toScreen(state.paddles.left.x, state.paddles.left.y);
+      const rpScreen = toScreen(state.paddles.right.x, state.paddles.right.y);
+      const paddleLeftX = lpScreen.x;
+      const paddleLeftY = lpScreen.y;
+      const paddleRightX = rpScreen.x;
+      const paddleRightY = rpScreen.y;
+
+      // On mobile, paddles are horizontal bars (swap W/H dims)
+      let paddleH: number, paddleW: number;
+      if (mob) {
+        paddleW = PADDLE_HEIGHT * (W / 500); // long dimension is now width
+        paddleH = PADDLE_WIDTH * (H / 800); // short dimension is now height
+      } else {
+        paddleH = PADDLE_HEIGHT * (H / 500);
+        paddleW = PADDLE_WIDTH * (W / 800);
+      }
       const ballR = BALL_SIZE * Math.min(W / 800, H / 500);
+
+      // Determine which paddle is "mine" and which is "opponent" for coloring on mobile
+      const myColor = role === "left" ? "#22d3ee" : "#f43f5e";
+      const oppColor = role === "left" ? "#f43f5e" : "#22d3ee";
 
       ctx.clearRect(0, 0, W, H);
 
@@ -320,46 +360,83 @@ export default function PongGame({ playerName }: { playerName: string }) {
       ctx.strokeStyle = "rgba(255,255,255,0.08)";
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(W / 2, 0);
-      ctx.lineTo(W / 2, H);
+      if (mob) {
+        ctx.moveTo(0, H / 2);
+        ctx.lineTo(W, H / 2);
+      } else {
+        ctx.moveTo(W / 2, 0);
+        ctx.lineTo(W / 2, H);
+      }
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Score
-      ctx.fillStyle = "rgba(255,255,255,0.1)";
-      ctx.font = `bold ${Math.floor(H * 0.15)}px system-ui, sans-serif`;
+      // Score & names
       ctx.textAlign = "center";
-      ctx.fillText(String(state.score.left), W / 4, H * 0.18);
-      ctx.fillText(String(state.score.right), (W * 3) / 4, H * 0.18);
+      if (mob) {
+        // Mobile: my score at bottom, opponent at top
+        const myScore = role === "left" ? state.score.left : state.score.right;
+        const oppScore = role === "left" ? state.score.right : state.score.left;
+        const myName = role === "left" ? state.names.left : state.names.right;
+        const oppName = role === "left" ? state.names.right : state.names.left;
+        const myLoc = role === "left" ? state.locations?.left : state.locations?.right;
+        const oppLoc = role === "left" ? state.locations?.right : state.locations?.left;
 
-      // Player names above scores
-      const nameSize = Math.max(14, Math.floor(H * 0.025));
-      ctx.font = `bold ${nameSize}px 'Courier New', monospace`;
+        const scoreSize = Math.floor(W * 0.12);
+        ctx.fillStyle = "rgba(255,255,255,0.1)";
+        ctx.font = `bold ${scoreSize}px system-ui, sans-serif`;
+        ctx.fillText(String(oppScore), W / 2, H * 0.15);
+        ctx.fillText(String(myScore), W / 2, H * 0.9);
 
-      if (state.names.left) {
-        ctx.fillStyle = "rgba(34, 211, 238, 0.6)";
-        ctx.fillText(state.names.left.toUpperCase(), W / 4, H * 0.05);
-        if (state.locations?.left) {
-          const locSize = Math.max(10, Math.floor(H * 0.016));
-          ctx.font = `${locSize}px 'Courier New', monospace`;
-          ctx.fillStyle = "rgba(34, 211, 238, 0.3)";
-          ctx.fillText(state.locations.left.toUpperCase(), W / 4, H * 0.05 + nameSize * 0.9);
-          ctx.font = `bold ${nameSize}px 'Courier New', monospace`;
+        const nameSize = Math.max(12, Math.floor(W * 0.03));
+        ctx.font = `bold ${nameSize}px 'Courier New', monospace`;
+        if (oppName) {
+          ctx.fillStyle = `${oppColor}99`;
+          ctx.fillText(oppName.toUpperCase(), W / 2, H * 0.04);
+          if (oppLoc) {
+            ctx.font = `${Math.max(9, nameSize - 3)}px 'Courier New', monospace`;
+            ctx.fillStyle = `${oppColor}55`;
+            ctx.fillText(oppLoc.toUpperCase(), W / 2, H * 0.04 + nameSize);
+          }
+        }
+        ctx.font = `bold ${nameSize}px 'Courier New', monospace`;
+        if (myName) {
+          ctx.fillStyle = `${myColor}99`;
+          ctx.fillText(myName.toUpperCase(), W / 2, H * 0.97);
+        }
+      } else {
+        // Desktop: left score on left, right score on right
+        ctx.fillStyle = "rgba(255,255,255,0.1)";
+        ctx.font = `bold ${Math.floor(H * 0.15)}px system-ui, sans-serif`;
+        ctx.fillText(String(state.score.left), W / 4, H * 0.18);
+        ctx.fillText(String(state.score.right), (W * 3) / 4, H * 0.18);
+
+        const nameSize = Math.max(14, Math.floor(H * 0.025));
+        ctx.font = `bold ${nameSize}px 'Courier New', monospace`;
+        if (state.names.left) {
+          ctx.fillStyle = "rgba(34, 211, 238, 0.6)";
+          ctx.fillText(state.names.left.toUpperCase(), W / 4, H * 0.05);
+          if (state.locations?.left) {
+            const locSize = Math.max(10, Math.floor(H * 0.016));
+            ctx.font = `${locSize}px 'Courier New', monospace`;
+            ctx.fillStyle = "rgba(34, 211, 238, 0.3)";
+            ctx.fillText(state.locations.left.toUpperCase(), W / 4, H * 0.05 + nameSize * 0.9);
+            ctx.font = `bold ${nameSize}px 'Courier New', monospace`;
+          }
+        }
+        if (state.names.right) {
+          ctx.fillStyle = "rgba(244, 63, 94, 0.6)";
+          ctx.fillText(state.names.right.toUpperCase(), (W * 3) / 4, H * 0.05);
+          if (state.locations?.right) {
+            const locSize = Math.max(10, Math.floor(H * 0.016));
+            ctx.font = `${locSize}px 'Courier New', monospace`;
+            ctx.fillStyle = "rgba(244, 63, 94, 0.3)";
+            ctx.fillText(state.locations.right.toUpperCase(), (W * 3) / 4, H * 0.05 + nameSize * 0.9);
+            ctx.font = `bold ${nameSize}px 'Courier New', monospace`;
+          }
         }
       }
-      if (state.names.right) {
-        ctx.fillStyle = "rgba(244, 63, 94, 0.6)";
-        ctx.fillText(state.names.right.toUpperCase(), (W * 3) / 4, H * 0.05);
-        if (state.locations?.right) {
-          const locSize = Math.max(10, Math.floor(H * 0.016));
-          ctx.font = `${locSize}px 'Courier New', monospace`;
-          ctx.fillStyle = "rgba(244, 63, 94, 0.3)";
-          ctx.fillText(state.locations.right.toUpperCase(), (W * 3) / 4, H * 0.05 + nameSize * 0.9);
-          ctx.font = `bold ${nameSize}px 'Courier New', monospace`;
-        }
-      }
 
-      // Left paddle
+      // Left paddle (on mobile: could be top or bottom depending on role)
       ctx.save();
       ctx.shadowColor = "#22d3ee";
       ctx.shadowBlur = state.slowed?.left ? 40 : 20;
@@ -442,8 +519,9 @@ export default function PongGame({ playerName }: { playerName: string }) {
       // Bullets
       if (state.bullets) {
         for (const b of state.bullets) {
-          const bx = b.x * W;
-          const by = b.y * H;
+          const bs = toScreen(b.x, b.y);
+          const bx = bs.x;
+          const by = bs.y;
           const bulletColor = b.owner === "left" ? "#22d3ee" : "#f43f5e";
 
           ctx.save();
@@ -470,8 +548,9 @@ export default function PongGame({ playerName }: { playerName: string }) {
 
       // Bullet pickup
       if (state.pickup?.active) {
-        const px = state.pickup.x * W;
-        const py = state.pickup.y * H;
+        const ps = toScreen(state.pickup.x, state.pickup.y);
+        const px = ps.x;
+        const py = ps.y;
         const pulse = 0.7 + 0.3 * Math.sin(Date.now() / 300);
 
         ctx.save();
@@ -510,23 +589,25 @@ export default function PongGame({ playerName }: { playerName: string }) {
         ctx.restore();
       }
 
-      // Ammo counter (bottom of screen, near cursor side)
+      // Ammo counter
       if (role === "left" || role === "right") {
         const myAmmo = state.ammo?.[role] ?? 0;
         if (myAmmo > 0) {
           ctx.save();
-          const ammoX = W / 2;
-          const ammoY = H - 30;
+          const ammoX = mob ? W - 30 : W / 2;
+          const ammoY = mob ? H / 2 : H - 30;
           const bulletColor = role === "left" ? "#22d3ee" : "#f43f5e";
 
           // Draw bullet dots
           for (let i = 0; i < myAmmo; i++) {
-            const dotX = ammoX - (myAmmo - 1) * 12 / 2 + i * 12;
+            const dotOffset = mob ? 0 : (- (myAmmo - 1) * 12 / 2 + i * 12);
+            const dotX = mob ? ammoX : ammoX + dotOffset;
+            const dotY = mob ? ammoY - (myAmmo - 1) * 12 / 2 + i * 12 : ammoY;
             ctx.shadowColor = bulletColor;
             ctx.shadowBlur = 10;
             ctx.fillStyle = bulletColor;
             ctx.beginPath();
-            ctx.arc(dotX, ammoY, 4, 0, Math.PI * 2);
+            ctx.arc(dotX, dotY, 4, 0, Math.PI * 2);
             ctx.fill();
           }
 
@@ -534,7 +615,7 @@ export default function PongGame({ playerName }: { playerName: string }) {
           ctx.textAlign = "center";
           ctx.fillStyle = "rgba(255,255,255,0.5)";
           ctx.shadowBlur = 0;
-          ctx.fillText("CLICK TO FIRE", ammoX, ammoY + 16);
+          ctx.fillText(mob ? "TAP" : "CLICK TO FIRE", ammoX, mob ? ammoY + (myAmmo * 12 / 2) + 16 : ammoY + 16);
           ctx.restore();
         }
       }
@@ -550,55 +631,81 @@ export default function PongGame({ playerName }: { playerName: string }) {
         ctx.shadowBlur = 15;
         const blink = Math.sin(Date.now() / 150) > 0 ? 1 : 0.3;
         ctx.globalAlpha = blink;
-        ctx.fillText("SLOWED!", W / 2, H * 0.12);
+        ctx.fillText("SLOWED!", W / 2, mob ? H * 0.85 : H * 0.12);
         ctx.globalAlpha = 1;
         ctx.restore();
       }
 
-      // Mouse cursor + glow
+      // Cursor / touch indicator
       ctx.save();
-      const cursorColor = "#ffffff";
-      const glowRGB = "255, 255, 255";
+      if (mob) {
+        // Mobile: show thumb/touch circle
+        const touchColor = role === "left" ? "#22d3ee" : role === "right" ? "#f43f5e" : "#ffffff";
+        const touchGrad = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 36);
+        touchGrad.addColorStop(0, `${touchColor}44`);
+        touchGrad.addColorStop(0.6, `${touchColor}18`);
+        touchGrad.addColorStop(1, "transparent");
+        ctx.fillStyle = touchGrad;
+        ctx.beginPath();
+        ctx.arc(mouse.x, mouse.y, 36, 0, Math.PI * 2);
+        ctx.fill();
 
-      const glowGrad = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 50);
-      glowGrad.addColorStop(0, `rgba(${glowRGB}, 0.15)`);
-      glowGrad.addColorStop(0.5, `rgba(${glowRGB}, 0.05)`);
-      glowGrad.addColorStop(1, `rgba(${glowRGB}, 0)`);
-      ctx.fillStyle = glowGrad;
-      ctx.beginPath();
-      ctx.arc(mouse.x, mouse.y, 50, 0, Math.PI * 2);
-      ctx.fill();
+        // Touch ring
+        ctx.strokeStyle = `${touchColor}88`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(mouse.x, mouse.y, 20, 0, Math.PI * 2);
+        ctx.stroke();
 
-      // Cursor arrow
-      ctx.translate(mouse.x, mouse.y);
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(0, 18);
-      ctx.lineTo(5, 14);
-      ctx.lineTo(8, 20);
-      ctx.lineTo(11, 19);
-      ctx.lineTo(8, 13);
-      ctx.lineTo(13, 12);
-      ctx.closePath();
-      ctx.fillStyle = cursorColor;
-      ctx.shadowColor = cursorColor;
-      ctx.shadowBlur = 10;
-      ctx.fill();
-      ctx.strokeStyle = "rgba(0,0,0,0.5)";
-      ctx.lineWidth = 0.5;
-      ctx.stroke();
+        // Small center dot
+        ctx.fillStyle = `${touchColor}cc`;
+        ctx.beginPath();
+        ctx.arc(mouse.x, mouse.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // Desktop: cursor arrow + glow
+        const cursorColor = "#ffffff";
+        const glowRGB = "255, 255, 255";
 
-      // Player name label next to cursor
-      const myName = role === "left" ? state.names.left : role === "right" ? state.names.right : "";
-      if (myName) {
-        const labelSize = Math.max(11, Math.floor(H * 0.018));
-        ctx.font = `bold ${labelSize}px 'Courier New', monospace`;
-        ctx.textAlign = "left";
-        const nameColor = role === "left" ? "#22d3ee" : "#f43f5e";
-        ctx.fillStyle = nameColor;
-        ctx.shadowColor = nameColor;
-        ctx.shadowBlur = 8;
-        ctx.fillText(myName.toUpperCase(), 18, 28);
+        const glowGrad = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 50);
+        glowGrad.addColorStop(0, `rgba(${glowRGB}, 0.15)`);
+        glowGrad.addColorStop(0.5, `rgba(${glowRGB}, 0.05)`);
+        glowGrad.addColorStop(1, `rgba(${glowRGB}, 0)`);
+        ctx.fillStyle = glowGrad;
+        ctx.beginPath();
+        ctx.arc(mouse.x, mouse.y, 50, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.translate(mouse.x, mouse.y);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(0, 18);
+        ctx.lineTo(5, 14);
+        ctx.lineTo(8, 20);
+        ctx.lineTo(11, 19);
+        ctx.lineTo(8, 13);
+        ctx.lineTo(13, 12);
+        ctx.closePath();
+        ctx.fillStyle = cursorColor;
+        ctx.shadowColor = cursorColor;
+        ctx.shadowBlur = 10;
+        ctx.fill();
+        ctx.strokeStyle = "rgba(0,0,0,0.5)";
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+
+        // Player name label next to cursor
+        const myName = role === "left" ? state.names.left : role === "right" ? state.names.right : "";
+        if (myName) {
+          const labelSize = Math.max(11, Math.floor(H * 0.018));
+          ctx.font = `bold ${labelSize}px 'Courier New', monospace`;
+          ctx.textAlign = "left";
+          const nameColor = role === "left" ? "#22d3ee" : "#f43f5e";
+          ctx.fillStyle = nameColor;
+          ctx.shadowColor = nameColor;
+          ctx.shadowBlur = 8;
+          ctx.fillText(myName.toUpperCase(), 18, 28);
+        }
       }
       ctx.restore();
 
