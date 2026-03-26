@@ -51,33 +51,37 @@ export default function Home() {
     <button
       onClick={onClick}
       disabled={!enabled}
+      className="arena-btn"
       style={{
         fontFamily: "'Courier New', Courier, monospace",
         fontSize: "1.5rem",
         fontWeight: "bold",
-        color: enabled ? "#22d3ee" : "rgba(34, 211, 238, 0.12)",
-        border: `2px solid ${enabled ? "#22d3ee" : "rgba(34, 211, 238, 0.12)"}`,
+        color: enabled ? "#fff" : "rgba(255, 255, 255, 0.12)",
+        border: `2px solid ${enabled ? "rgba(255, 160, 50, 0.8)" : "rgba(255, 160, 50, 0.12)"}`,
         borderRadius: "9999px",
         padding: "16px 56px",
-        background: "transparent",
+        background: enabled ? "rgba(255, 80, 20, 0.1)" : "transparent",
         cursor: enabled ? "pointer" : "default",
-        textShadow: enabled ? "0 0 10px rgba(34, 211, 238, 0.8)" : "none",
+        textShadow: enabled
+          ? "0 0 10px rgba(255, 200, 50, 1), 0 0 20px rgba(255, 120, 20, 0.8), 0 0 40px rgba(255, 60, 10, 0.5)"
+          : "none",
         boxShadow: enabled
-          ? "0 0 15px rgba(34, 211, 238, 0.3), inset 0 0 15px rgba(34, 211, 238, 0.1)"
+          ? "0 0 15px rgba(255, 120, 20, 0.4), 0 0 30px rgba(255, 60, 10, 0.2), inset 0 0 15px rgba(255, 120, 20, 0.1)"
           : "none",
         transition: "all 0.3s",
         letterSpacing: "0.15em",
+        animation: enabled ? "fire-glow 1.5s ease-in-out infinite" : "none",
       }}
       onMouseEnter={(e) => {
         if (!enabled) return;
-        e.currentTarget.style.background = "rgba(34, 211, 238, 0.15)";
+        e.currentTarget.style.background = "rgba(255, 80, 20, 0.25)";
         e.currentTarget.style.boxShadow =
-          "0 0 30px rgba(34, 211, 238, 0.5), inset 0 0 30px rgba(34, 211, 238, 0.2)";
+          "0 0 25px rgba(255, 160, 50, 0.6), 0 0 50px rgba(255, 80, 20, 0.4), 0 0 80px rgba(255, 40, 0, 0.2), inset 0 0 25px rgba(255, 120, 20, 0.15)";
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = "transparent";
+        e.currentTarget.style.background = "rgba(255, 80, 20, 0.1)";
         e.currentTarget.style.boxShadow = enabled
-          ? "0 0 15px rgba(34, 211, 238, 0.3), inset 0 0 15px rgba(34, 211, 238, 0.1)"
+          ? "0 0 15px rgba(255, 120, 20, 0.4), 0 0 30px rgba(255, 60, 10, 0.2), inset 0 0 15px rgba(255, 120, 20, 0.1)"
           : "none";
       }}
     >
@@ -103,37 +107,28 @@ export default function Home() {
               backdropFilter: "blur(8px)",
             }}
           >
-            <span
-              style={{
-                fontFamily: "'Courier New', Courier, monospace",
-                fontSize: "0.85rem",
-                color: "rgba(255, 255, 255, 0.5)",
-                letterSpacing: "0.15em",
-                marginRight: "12px",
-                whiteSpace: "nowrap",
-              }}
-            >
-              PLAYER NAME
-            </span>
             <input
+              className="name-input"
               type="text"
               value={playerName}
               onChange={(e) => setPlayerName(e.target.value.slice(0, 12))}
               onKeyDown={(e) => e.key === "Enter" && handleNameSubmit()}
-              placeholder=""
+              placeholder="PLAYER NAME"
               maxLength={12}
               autoFocus
               style={{
                 fontFamily: "'Courier New', Courier, monospace",
-                fontSize: "1.2rem",
+                fontSize: "1.1rem",
                 fontWeight: "bold",
                 color: "#ffffff",
                 border: "none",
-                padding: "4px 0",
+                padding: "8px 0",
                 background: "transparent",
                 outline: "none",
-                width: "180px",
+                width: "280px",
                 caretColor: "#ffffff",
+                textAlign: "center",
+                letterSpacing: "0.15em",
               }}
             />
           </div>
@@ -170,6 +165,24 @@ export default function Home() {
           <PongGame playerName={playerName} />
         </>
       )}
+      <style jsx>{`
+        @keyframes fire-glow {
+          0%, 100% {
+            box-shadow: 0 0 15px rgba(255, 120, 20, 0.4), 0 0 30px rgba(255, 60, 10, 0.2), inset 0 0 15px rgba(255, 120, 20, 0.1);
+            border-color: rgba(255, 160, 50, 0.8);
+          }
+          50% {
+            box-shadow: 0 0 25px rgba(255, 160, 50, 0.6), 0 0 50px rgba(255, 80, 20, 0.35), 0 0 70px rgba(255, 40, 0, 0.15), inset 0 0 20px rgba(255, 120, 20, 0.15);
+            border-color: rgba(255, 200, 80, 0.9);
+          }
+        }
+        .name-input::placeholder {
+          color: rgba(255, 255, 255, 0.4);
+          font-family: 'Courier New', Courier, monospace;
+          font-weight: bold;
+          letter-spacing: 0.15em;
+        }
+      `}</style>
     </main>
   );
 }
