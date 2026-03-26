@@ -12,6 +12,7 @@ export default function Home() {
   const [screen, setScreen] = useState<Screen>("name");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [mobilePlayerCount, setMobilePlayerCount] = useState(0);
+  const [mobileMusicPlaying, setMobileMusicPlaying] = useState(false);
 
   useEffect(() => {
     const isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(
@@ -206,6 +207,32 @@ export default function Home() {
               GLOBAL PLAYERS
             </span>
           </div>
+          {!mobileMusicPlaying && (
+            <button
+              onClick={() => {
+                const audio = new Audio(`${process.env.NODE_ENV === "production" ? "/cursorking" : ""}/music.mp3`);
+                audio.volume = 0.5;
+                audio.loop = true;
+                audio.play().catch(() => {});
+                audioRef.current = audio;
+                setMobileMusicPlaying(true);
+              }}
+              style={{
+                marginTop: "16px",
+                fontFamily: "'Courier New', monospace",
+                fontSize: "0.7rem",
+                color: "rgba(255, 255, 255, 0.4)",
+                background: "rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(255, 255, 255, 0.15)",
+                borderRadius: "9999px",
+                padding: "8px 20px",
+                cursor: "pointer",
+                letterSpacing: "0.15em",
+              }}
+            >
+              ♪ TAP FOR MUSIC
+            </button>
+          )}
         </div>
       )}
 
