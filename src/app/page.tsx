@@ -86,9 +86,9 @@ export default function Home() {
   );
 
   return (
-    <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden cursor-none">
+    <main className={`relative flex min-h-screen flex-col items-center justify-center overflow-hidden ${screen !== "name" ? "cursor-none" : ""}`}>
       <SpaceBackground />
-      {screen !== "game" && <MenuCursor name={screen === "name" ? "" : playerName} />}
+      {screen === "start" && <MenuCursor name={playerName} />}
 
       {screen === "name" && (
         <div className="relative z-10 flex flex-col items-center gap-4 text-center px-4">
