@@ -2,11 +2,9 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 
-const CANVAS_WIDTH = 800;
-const CANVAS_HEIGHT = 500;
-const PADDLE_WIDTH = 12;
-const PADDLE_HEIGHT = 80;
-const PADDLE_OFFSET = 20;
+const PADDLE_WIDTH = 14;
+const PADDLE_HEIGHT = 100;
+const PADDLE_OFFSET = 30;
 const BALL_SIZE = 10;
 
 const WS_URL =
@@ -18,12 +16,14 @@ type GameState = {
   score: { left: number; right: number };
 };
 
+type BallTrail = { x: number; y: number; age: number };
+
 export default function PongGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const [gameState, setGameState] = useState<GameState>({
-    ball: { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 },
-    paddles: { left: CANVAS_HEIGHT / 2, right: CANVAS_HEIGHT / 2 },
+    ball: { x: 0.5, y: 0.5 },
+    paddles: { left: 0.5, right: 0.5 },
     score: { left: 0, right: 0 },
   });
   const [myRole, setMyRole] = useState<"left" | "right" | "spectator">("spectator");
@@ -31,6 +31,9 @@ export default function PongGame() {
   const gameStateRef = useRef(gameState);
   const myRoleRef = useRef(myRole);
   const lastSentRef = useRef(0);
+  const mouseRef = useRef({ x: 0, y: 0 });
+  const ballTrailRef = useRef<BallTrail[]>([]);
+  const canvasSizeRef = useRef({ w: 800, h: 500 });
   gameStateRef.current = gameState;
   myRoleRef.current = myRole;
 
@@ -58,7 +61,6 @@ export default function PongGame() {
 
       ws.onclose = () => {
         wsRef.current = null;
-        // Reconnect after 1s
         setTimeout(connect, 1000);
       };
 
@@ -74,34 +76,26 @@ export default function PongGame() {
   }, []);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
+    mouseRef.current = { x: e.clientX, y: e.clientY };
     const role = myRoleRef.current;
     if (role === "spectator") return;
 
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
+    const { w, h } = canvasSizeRef.current;
 
     // Check if cursor is within the player's 40% zone
-    const relX = e.clientX - rect.left;
-    const canvasDisplayWidth = rect.width;
-
-    if (role === "left" && relX > canvasDisplayWidth * 0.4) return;
-    if (role === "right" && relX < canvasDisplayWidth * 0.6) return;
+    const relX = e.clientX / w;
+    if (role === "left" && relX > 0.4) return;
+    if (role === "right" && relX < 0.6) return;
 
     // Throttle to ~60fps
     const now = Date.now();
     if (now - lastSentRef.current < 16) return;
     lastSentRef.current = now;
 
-    const scaleY = CANVAS_HEIGHT / rect.height;
-    const y = (e.clientY - rect.top) * scaleY;
-    const clampedY = Math.max(
-      PADDLE_HEIGHT / 2,
-      Math.min(CANVAS_HEIGHT - PADDLE_HEIGHT / 2, y)
-    );
+    // Send normalized Y (0-1)
+    const normalizedY = Math.max(0, Math.min(1, e.clientY / h));
 
-    wsRef.current?.send(JSON.stringify({ type: "paddle-move", y: clampedY }));
+    wsRef.current?.send(JSON.stringify({ type: "paddle-move", y: normalizedY }));
   }, []);
 
   useEffect(() => {
@@ -109,114 +103,191 @@ export default function PongGame() {
     return () => window.removeEventListener("pointermove", handlePointerMove);
   }, [handlePointerMove]);
 
-  // Canvas rendering
+  // Canvas rendering - full browser
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    function resize() {
+      if (!canvas) return;
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      canvasSizeRef.current = { w: canvas.width, h: canvas.height };
+    }
+    resize();
+    window.addEventListener("resize", resize);
+
     let animId: number;
 
     function draw() {
-      if (!ctx) return;
+      if (!ctx || !canvas) return;
       const state = gameStateRef.current;
       const role = myRoleRef.current;
+      const mouse = mouseRef.current;
+      const W = canvas.width;
+      const H = canvas.height;
 
-      // Background
-      ctx.fillStyle = "#0a0a0a";
-      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      // Convert normalized server coords to screen
+      const ballX = state.ball.x * W;
+      const ballY = state.ball.y * H;
+      const paddleLeftY = state.paddles.left * H;
+      const paddleRightY = state.paddles.right * H;
+      const paddleH = PADDLE_HEIGHT * (H / 500);
+      const paddleW = PADDLE_WIDTH * (W / 800);
+      const paddleOff = PADDLE_OFFSET * (W / 800);
+      const ballR = BALL_SIZE * Math.min(W / 800, H / 500);
+
+      // Clear (transparent — space bg shows through)
+      ctx.clearRect(0, 0, W, H);
 
       // Player's 40% zone highlight
       if (role === "left") {
-        ctx.fillStyle = "rgba(34, 211, 238, 0.03)";
-        ctx.fillRect(0, 0, CANVAS_WIDTH * 0.4, CANVAS_HEIGHT);
-        ctx.strokeStyle = "rgba(34, 211, 238, 0.1)";
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(CANVAS_WIDTH * 0.4, 0);
-        ctx.lineTo(CANVAS_WIDTH * 0.4, CANVAS_HEIGHT);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        const grad = ctx.createLinearGradient(0, 0, W * 0.4, 0);
+        grad.addColorStop(0, "rgba(34, 211, 238, 0.04)");
+        grad.addColorStop(1, "rgba(34, 211, 238, 0.0)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W * 0.4, H);
       } else if (role === "right") {
-        ctx.fillStyle = "rgba(244, 63, 94, 0.03)";
-        ctx.fillRect(CANVAS_WIDTH * 0.6, 0, CANVAS_WIDTH * 0.4, CANVAS_HEIGHT);
-        ctx.strokeStyle = "rgba(244, 63, 94, 0.1)";
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(CANVAS_WIDTH * 0.6, 0);
-        ctx.lineTo(CANVAS_WIDTH * 0.6, CANVAS_HEIGHT);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        const grad = ctx.createLinearGradient(W * 0.6, 0, W, 0);
+        grad.addColorStop(0, "rgba(244, 63, 94, 0.0)");
+        grad.addColorStop(1, "rgba(244, 63, 94, 0.04)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(W * 0.6, 0, W * 0.4, H);
       }
 
       // Center line
-      ctx.setLineDash([8, 8]);
-      ctx.strokeStyle = "rgba(255,255,255,0.1)";
+      ctx.setLineDash([12, 12]);
+      ctx.strokeStyle = "rgba(255,255,255,0.08)";
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(CANVAS_WIDTH / 2, 0);
-      ctx.lineTo(CANVAS_WIDTH / 2, CANVAS_HEIGHT);
+      ctx.moveTo(W / 2, 0);
+      ctx.lineTo(W / 2, H);
       ctx.stroke();
       ctx.setLineDash([]);
 
       // Score
-      ctx.fillStyle = "rgba(255,255,255,0.15)";
-      ctx.font = "bold 80px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(255,255,255,0.1)";
+      ctx.font = `bold ${Math.floor(H * 0.15)}px system-ui, sans-serif`;
       ctx.textAlign = "center";
-      ctx.fillText(String(state.score.left), CANVAS_WIDTH / 4, 90);
-      ctx.fillText(String(state.score.right), (CANVAS_WIDTH * 3) / 4, 90);
+      ctx.fillText(String(state.score.left), W / 4, H * 0.18);
+      ctx.fillText(String(state.score.right), (W * 3) / 4, H * 0.18);
 
-      // Left paddle
-      ctx.fillStyle = "#22d3ee";
+      // Left paddle (glowing)
+      ctx.save();
       ctx.shadowColor = "#22d3ee";
-      ctx.shadowBlur = 15;
-      ctx.fillRect(
-        PADDLE_OFFSET,
-        state.paddles.left - PADDLE_HEIGHT / 2,
-        PADDLE_WIDTH,
-        PADDLE_HEIGHT
-      );
-
-      // Right paddle
-      ctx.fillStyle = "#f43f5e";
-      ctx.shadowColor = "#f43f5e";
-      ctx.shadowBlur = 15;
-      ctx.fillRect(
-        CANVAS_WIDTH - PADDLE_OFFSET - PADDLE_WIDTH,
-        state.paddles.right - PADDLE_HEIGHT / 2,
-        PADDLE_WIDTH,
-        PADDLE_HEIGHT
-      );
-
-      // Ball
-      ctx.shadowColor = "#ffffff";
-      ctx.shadowBlur = 20;
-      ctx.fillStyle = "#ffffff";
+      ctx.shadowBlur = 25;
+      ctx.fillStyle = "#22d3ee";
+      const lx = paddleOff;
+      const ly = paddleLeftY - paddleH / 2;
       ctx.beginPath();
-      ctx.arc(state.ball.x, state.ball.y, BALL_SIZE, 0, Math.PI * 2);
+      ctx.roundRect(lx, ly, paddleW, paddleH, 6);
+      ctx.fill();
+      ctx.restore();
+
+      // Right paddle (glowing)
+      ctx.save();
+      ctx.shadowColor = "#f43f5e";
+      ctx.shadowBlur = 25;
+      ctx.fillStyle = "#f43f5e";
+      const rx = W - paddleOff - paddleW;
+      const ry = paddleRightY - paddleH / 2;
+      ctx.beginPath();
+      ctx.roundRect(rx, ry, paddleW, paddleH, 6);
+      ctx.fill();
+      ctx.restore();
+
+      // Ball trail
+      const trail = ballTrailRef.current;
+      trail.push({ x: ballX, y: ballY, age: 0 });
+      // Keep last 20 trail points
+      while (trail.length > 20) trail.shift();
+
+      for (let i = 0; i < trail.length; i++) {
+        trail[i].age++;
+        const t = trail[i];
+        const life = 1 - t.age / 25;
+        if (life <= 0) continue;
+
+        const r = ballR * life * 0.8;
+        // Fire gradient: white center -> yellow -> orange -> red -> transparent
+        const grad = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, r * 3);
+        grad.addColorStop(0, `rgba(255, 200, 50, ${life * 0.6})`);
+        grad.addColorStop(0.3, `rgba(255, 100, 20, ${life * 0.4})`);
+        grad.addColorStop(0.7, `rgba(200, 30, 0, ${life * 0.15})`);
+        grad.addColorStop(1, "rgba(100, 0, 0, 0)");
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, r * 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Ball (glowing white-hot core)
+      ctx.save();
+      const ballGrad = ctx.createRadialGradient(ballX, ballY, 0, ballX, ballY, ballR * 4);
+      ballGrad.addColorStop(0, "rgba(255, 255, 255, 1)");
+      ballGrad.addColorStop(0.15, "rgba(255, 240, 180, 0.9)");
+      ballGrad.addColorStop(0.3, "rgba(255, 160, 50, 0.5)");
+      ballGrad.addColorStop(0.6, "rgba(255, 60, 10, 0.2)");
+      ballGrad.addColorStop(1, "rgba(200, 0, 0, 0)");
+      ctx.fillStyle = ballGrad;
+      ctx.beginPath();
+      ctx.arc(ballX, ballY, ballR * 4, 0, Math.PI * 2);
       ctx.fill();
 
-      // Reset shadow
-      ctx.shadowBlur = 0;
+      // Bright core
+      ctx.shadowColor = "#ffffff";
+      ctx.shadowBlur = 30;
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(ballX, ballY, ballR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // Mouse glow
+      ctx.save();
+      const glowGrad = ctx.createRadialGradient(
+        mouse.x, mouse.y, 0,
+        mouse.x, mouse.y, 80
+      );
+      const glowColor = role === "left" ? "34, 211, 238" : role === "right" ? "244, 63, 94" : "255, 255, 255";
+      glowGrad.addColorStop(0, `rgba(${glowColor}, 0.15)`);
+      glowGrad.addColorStop(0.5, `rgba(${glowColor}, 0.05)`);
+      glowGrad.addColorStop(1, `rgba(${glowColor}, 0)`);
+      ctx.fillStyle = glowGrad;
+      ctx.beginPath();
+      ctx.arc(mouse.x, mouse.y, 80, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
 
       animId = requestAnimationFrame(draw);
     }
 
     draw();
-    return () => cancelAnimationFrame(animId);
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener("resize", resize);
+    };
   }, []);
 
   const roleLabel =
     myRole === "left"
-      ? "You are CYAN (left) — move your mouse on the left 40%"
+      ? "You are CYAN (left)"
       : myRole === "right"
-        ? "You are RED (right) — move your mouse on the right 40%"
+        ? "You are RED (right)"
         : "Spectating — waiting for a spot";
 
   return (
-    <div className="relative z-10 flex flex-col items-center gap-4">
-      <div className="flex w-full max-w-[800px] items-center justify-between px-2">
+    <>
+      <canvas
+        ref={canvasRef}
+        className="fixed inset-0 z-10"
+        style={{ width: "100vw", height: "100vh" }}
+      />
+
+      {/* HUD overlay */}
+      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-6">
         <span
           className={`text-sm font-medium ${
             myRole === "left"
@@ -233,13 +304,6 @@ export default function PongGame() {
           {playerCount} {playerCount === 1 ? "player" : "players"}
         </span>
       </div>
-      <canvas
-        ref={canvasRef}
-        width={CANVAS_WIDTH}
-        height={CANVAS_HEIGHT}
-        className="rounded-lg border border-white/10 shadow-2xl"
-        style={{ maxWidth: "100%", height: "auto" }}
-      />
-    </div>
+    </>
   );
 }

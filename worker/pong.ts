@@ -1,12 +1,8 @@
 import { DurableObject } from "cloudflare:workers";
 
-const CANVAS_WIDTH = 800;
-const CANVAS_HEIGHT = 500;
-const PADDLE_HEIGHT = 80;
-const PADDLE_WIDTH = 12;
-const PADDLE_OFFSET = 20;
-const BALL_SIZE = 10;
-const BALL_SPEED = 5;
+const PADDLE_HEIGHT = 0.2; // 20% of screen height
+const BALL_SIZE = 0.012;
+const BALL_SPEED = 0.008;
 
 type GameState = {
   ball: { x: number; y: number; vx: number; vy: number };
@@ -32,12 +28,12 @@ export class PongRoom extends DurableObject {
     const dir = Math.random() > 0.5 ? 1 : -1;
     return {
       ball: {
-        x: CANVAS_WIDTH / 2,
-        y: CANVAS_HEIGHT / 2,
+        x: 0.5,
+        y: 0.5,
         vx: BALL_SPEED * dir * Math.cos(angle),
         vy: BALL_SPEED * Math.sin(angle),
       },
-      paddles: { left: CANVAS_HEIGHT / 2, right: CANVAS_HEIGHT / 2 },
+      paddles: { left: 0.5, right: 0.5 },
       score: { left: 0, right: 0 },
     };
   }
@@ -46,8 +42,8 @@ export class PongRoom extends DurableObject {
     const angle = (Math.random() * Math.PI) / 4 - Math.PI / 8;
     const dir = scoredSide === "left" ? -1 : 1;
     this.state_.ball = {
-      x: CANVAS_WIDTH / 2,
-      y: CANVAS_HEIGHT / 2,
+      x: 0.5,
+      y: 0.5,
       vx: BALL_SPEED * dir * Math.cos(angle),
       vy: BALL_SPEED * Math.sin(angle),
     };
@@ -88,50 +84,54 @@ export class PongRoom extends DurableObject {
     ball.x += ball.vx;
     ball.y += ball.vy;
 
+    // Top/bottom bounce (normalized 0-1)
     if (ball.y - BALL_SIZE <= 0) {
       ball.y = BALL_SIZE;
       ball.vy = Math.abs(ball.vy);
     }
-    if (ball.y + BALL_SIZE >= CANVAS_HEIGHT) {
-      ball.y = CANVAS_HEIGHT - BALL_SIZE;
+    if (ball.y + BALL_SIZE >= 1) {
+      ball.y = 1 - BALL_SIZE;
       ball.vy = -Math.abs(ball.vy);
     }
 
-    const leftPaddleX = PADDLE_OFFSET + PADDLE_WIDTH;
+    // Left paddle collision (at ~4% from left edge)
+    const leftPaddleX = 0.04 + 0.018;
     if (
       ball.x - BALL_SIZE <= leftPaddleX &&
-      ball.x - BALL_SIZE >= PADDLE_OFFSET &&
+      ball.x - BALL_SIZE >= 0.04 &&
       ball.y >= paddles.left - PADDLE_HEIGHT / 2 &&
       ball.y <= paddles.left + PADDLE_HEIGHT / 2
     ) {
       ball.x = leftPaddleX + BALL_SIZE;
       const hitPos = (ball.y - paddles.left) / (PADDLE_HEIGHT / 2);
       const angle = hitPos * (Math.PI / 4);
-      const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) + 0.2;
+      const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) + 0.0003;
       ball.vx = Math.abs(speed * Math.cos(angle));
       ball.vy = speed * Math.sin(angle);
     }
 
-    const rightPaddleX = CANVAS_WIDTH - PADDLE_OFFSET - PADDLE_WIDTH;
+    // Right paddle collision (at ~4% from right edge)
+    const rightPaddleX = 1 - 0.04 - 0.018;
     if (
       ball.x + BALL_SIZE >= rightPaddleX &&
-      ball.x + BALL_SIZE <= CANVAS_WIDTH - PADDLE_OFFSET &&
+      ball.x + BALL_SIZE <= 1 - 0.04 &&
       ball.y >= paddles.right - PADDLE_HEIGHT / 2 &&
       ball.y <= paddles.right + PADDLE_HEIGHT / 2
     ) {
       ball.x = rightPaddleX - BALL_SIZE;
       const hitPos = (ball.y - paddles.right) / (PADDLE_HEIGHT / 2);
       const angle = hitPos * (Math.PI / 4);
-      const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) + 0.2;
+      const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) + 0.0003;
       ball.vx = -Math.abs(speed * Math.cos(angle));
       ball.vy = speed * Math.sin(angle);
     }
 
+    // Scoring
     if (ball.x < 0) {
       this.state_.score.right++;
       this.resetBall("right");
     }
-    if (ball.x > CANVAS_WIDTH) {
+    if (ball.x > 1) {
       this.state_.score.left++;
       this.resetBall("left");
     }
@@ -211,9 +211,14 @@ export class PongRoom extends DurableObject {
     if (data.type === "paddle-move") {
       const y = Math.max(
         PADDLE_HEIGHT / 2,
-        Math.min(CANVAS_HEIGHT - PADDLE_HEIGHT / 2, data.y)
+        Math.min(1 - PADDLE_HEIGHT / 2, data.y)
       );
       this.state_.paddles[role] = y;
+
+      // Broadcast paddle state even before game starts
+      if (!this.running) {
+        this.broadcastState();
+      }
     }
   }
 
@@ -224,7 +229,6 @@ export class PongRoom extends DurableObject {
     this.allSockets.delete(ws);
 
     if (role) {
-      // Promote a spectator
       const next = [...this.spectators][0];
       if (next) {
         this.spectators.delete(next);
@@ -251,7 +255,6 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    // CORS headers for cross-origin WebSocket from GitHub Pages
     if (request.method === "OPTIONS") {
       return new Response(null, {
         headers: {
