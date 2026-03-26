@@ -24,6 +24,7 @@ export default function Home() {
     // Pre-load audio on this user gesture to unlock Chrome autoplay
     const audio = new Audio(`${process.env.NODE_ENV === "production" ? "/cursorking" : ""}/music.mp3`);
     audio.volume = 0.5;
+    audio.loop = true;
     audio.load();
     audioRef.current = audio;
     setScreen("start");
