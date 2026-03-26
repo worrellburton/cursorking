@@ -45,8 +45,8 @@ export class PongRoom extends DurableObject {
   bullets: Bullet[] = [];
   ammo: { left: number; right: number } = { left: 0, right: 0 };
   pickup: { x: number; y: number; active: boolean } = { x: 0.5, y: 0.92, active: false };
-  pickupTimer: ReturnType<typeof setTimeout> | null = null;
   slowedUntil: { left: number; right: number } = { left: 0, right: 0 };
+  nextPickupTime = 0;
   cursorPositions: { left: { x: number; y: number }; right: { x: number; y: number } } = {
     left: { x: 0.04, y: 0.5 },
     right: { x: 0.96, y: 0.5 },
@@ -107,16 +107,6 @@ export class PongRoom extends DurableObject {
     return "spectator";
   }
 
-  schedulePickup() {
-    if (this.pickupTimer) clearTimeout(this.pickupTimer);
-    this.pickupTimer = setTimeout(() => {
-      if (this.running && !this.winner) {
-        this.pickup = { x: 0.5, y: 0.92, active: true };
-        this.broadcastState();
-      }
-    }, PICKUP_SPAWN_INTERVAL);
-  }
-
   startGame() {
     if (this.running) return;
     this.winner = null;
@@ -126,6 +116,7 @@ export class PongRoom extends DurableObject {
     this.ammo = { left: 0, right: 0 };
     this.pickup = { x: 0.5, y: 0.92, active: false };
     this.slowedUntil = { left: 0, right: 0 };
+    this.nextPickupTime = Date.now() + PICKUP_SPAWN_INTERVAL;
     this.broadcastState();
 
     this.broadcast(JSON.stringify({ type: "countdown", value: 3 }));
@@ -139,7 +130,6 @@ export class PongRoom extends DurableObject {
       this.broadcast(JSON.stringify({ type: "countdown", value: 0 }));
       this.running = true;
       this.interval = setInterval(() => this.tick(), 1000 / 60);
-      this.schedulePickup();
     }, 3000);
   }
 
@@ -148,10 +138,6 @@ export class PongRoom extends DurableObject {
     if (this.interval) {
       clearInterval(this.interval);
       this.interval = null;
-    }
-    if (this.pickupTimer) {
-      clearTimeout(this.pickupTimer);
-      this.pickupTimer = null;
     }
   }
 
@@ -220,6 +206,11 @@ export class PongRoom extends DurableObject {
       const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * BALL_ACCEL;
       ball.vx = -Math.abs(speed * Math.cos(angle));
       ball.vy = speed * Math.sin(angle);
+    }
+
+    // Spawn pickup if timer elapsed
+    if (!this.pickup.active && now >= this.nextPickupTime) {
+      this.pickup = { x: 0.5, y: 0.92, active: true };
     }
 
     // Update bullets
@@ -439,8 +430,8 @@ export class PongRoom extends DurableObject {
         if (Math.sqrt(dx * dx + dy * dy) < BULLET_PICKUP_RADIUS * 2) {
           this.pickup.active = false;
           this.ammo[role] += 3;
+          this.nextPickupTime = Date.now() + PICKUP_SPAWN_INTERVAL;
           this.broadcastState();
-          this.schedulePickup();
         }
       }
     }
