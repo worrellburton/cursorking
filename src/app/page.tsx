@@ -22,7 +22,7 @@ export default function Home() {
   const handleNameSubmit = () => {
     if (!playerName.trim()) return;
     // Pre-load audio on this user gesture to unlock Chrome autoplay
-    const audio = new Audio(`${process.env.NODE_ENV === "production" ? "/cursorking" : ""}/menu.mp3`);
+    const audio = new Audio(`${process.env.NODE_ENV === "production" ? "/cursorking" : ""}/music.mp3`);
     audio.volume = 0.5;
     audio.load();
     audioRef.current = audio;
