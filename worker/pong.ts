@@ -4,7 +4,8 @@ const PADDLE_HEIGHT = 0.14;
 const PADDLE_WIDTH = 0.018;
 const BALL_SIZE = 0.009;
 const BALL_SPEED = 0.007;
-const BALL_ACCEL = 1.02;
+const BALL_ACCEL = 1.04;       // speed multiplier on each paddle hit
+const BALL_TICK_ACCEL = 1.0002; // continuous speed increase per tick (~60/sec)
 const WIN_SCORE = 3;
 const RESTART_DELAY = 3000;
 
@@ -121,6 +122,10 @@ export class PongRoom extends DurableObject {
     if (this.winner) return;
 
     const { ball, paddles } = this.state_;
+
+    // Continuous speed increase every tick
+    ball.vx *= BALL_TICK_ACCEL;
+    ball.vy *= BALL_TICK_ACCEL;
 
     ball.x += ball.vx;
     ball.y += ball.vy;
