@@ -186,21 +186,21 @@ export default function PongGame({ playerName }: { playerName: string }) {
     const state = gameStateRef.current;
 
     // Check if clicking near pickup
-    if (state.pickup.active) {
+    if (state.pickup?.active) {
       const { w, h } = canvasSizeRef.current;
       const mouse = mouseRef.current;
       const mx = mouse.x / w;
       const my = mouse.y / h;
       const dx = mx - state.pickup.x;
       const dy = my - state.pickup.y;
-      if (Math.sqrt(dx * dx + dy * dy) < 0.06) {
+      if (Math.sqrt(dx * dx + dy * dy) < 0.12) {
         wsRef.current?.send(JSON.stringify({ type: "grab-pickup" }));
         return;
       }
     }
 
     // Otherwise fire bullet if we have ammo
-    if (state.ammo[role] > 0) {
+    if ((state.ammo?.[role] ?? 0) > 0) {
       wsRef.current?.send(JSON.stringify({ type: "fire-bullet" }));
     }
   }, []);
@@ -436,30 +436,38 @@ export default function PongGame({ playerName }: { playerName: string }) {
         const pulse = 0.7 + 0.3 * Math.sin(Date.now() / 300);
 
         ctx.save();
+        // Outer pulse ring
+        ctx.strokeStyle = `rgba(255, 220, 50, ${pulse * 0.4})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(px, py, 35 + pulse * 5, 0, Math.PI * 2);
+        ctx.stroke();
+
         // Pickup glow
-        const pGrad = ctx.createRadialGradient(px, py, 0, px, py, 25);
+        const pGrad = ctx.createRadialGradient(px, py, 0, px, py, 40);
         pGrad.addColorStop(0, `rgba(255, 220, 50, ${pulse})`);
-        pGrad.addColorStop(0.4, `rgba(255, 160, 20, ${pulse * 0.5})`);
+        pGrad.addColorStop(0.3, `rgba(255, 160, 20, ${pulse * 0.6})`);
+        pGrad.addColorStop(0.6, `rgba(255, 100, 0, ${pulse * 0.2})`);
         pGrad.addColorStop(1, "transparent");
         ctx.fillStyle = pGrad;
         ctx.beginPath();
-        ctx.arc(px, py, 25, 0, Math.PI * 2);
+        ctx.arc(px, py, 40, 0, Math.PI * 2);
         ctx.fill();
 
-        // Pickup icon (bullet shape)
+        // Pickup icon
         ctx.shadowColor = "#ffdd33";
-        ctx.shadowBlur = 20;
+        ctx.shadowBlur = 25;
         ctx.fillStyle = "#ffdd33";
         ctx.beginPath();
-        ctx.arc(px, py, 6, 0, Math.PI * 2);
+        ctx.arc(px, py, 10, 0, Math.PI * 2);
         ctx.fill();
 
-        // "x3" label
-        ctx.font = `bold 11px 'Courier New', monospace`;
+        // "AMMO x3" label
+        ctx.font = `bold 13px 'Courier New', monospace`;
         ctx.textAlign = "center";
-        ctx.fillStyle = "#ffffff";
-        ctx.shadowBlur = 0;
-        ctx.fillText("x3", px, py + 20);
+        ctx.fillStyle = "#ffdd33";
+        ctx.shadowBlur = 10;
+        ctx.fillText("AMMO x3", px, py + 28);
         ctx.restore();
       }
 

@@ -15,11 +15,11 @@ const RIGHT_X_MIN = 0.55;
 const RIGHT_X_MAX = 0.98;
 
 const BULLET_SPEED = 0.015;
-const BULLET_PICKUP_RADIUS = 0.03;
-const BULLET_HIT_RADIUS = 0.04;
+const BULLET_PICKUP_RADIUS = 0.06;
+const BULLET_HIT_RADIUS = 0.05;
 const SLOW_DURATION = 3000; // ms of slowdown
 const SLOW_FACTOR = 0.35;  // paddle speed multiplier when slowed
-const PICKUP_SPAWN_INTERVAL = 8000; // ms between pickup spawns
+const PICKUP_SPAWN_INTERVAL = 5000; // ms between pickup spawns
 
 type PaddleState = { x: number; y: number };
 type Bullet = { x: number; y: number; vx: number; owner: "left" | "right" };
@@ -45,7 +45,7 @@ export class PongRoom extends DurableObject {
   // Bullet system
   bullets: Bullet[] = [];
   ammo: { left: number; right: number } = { left: 0, right: 0 };
-  pickup: { x: number; y: number; active: boolean } = { x: 0.5, y: 0.92, active: false };
+  pickup: { x: number; y: number; active: boolean } = { x: 0.5, y: 0.5, active: false };
   slowedUntil: { left: number; right: number } = { left: 0, right: 0 };
   nextPickupTime = 0;
   cursorPositions: { left: { x: number; y: number }; right: { x: number; y: number } } = {
@@ -122,7 +122,7 @@ export class PongRoom extends DurableObject {
     this.state_ = { ...fresh, score: { left: 0, right: 0 } };
     this.bullets = [];
     this.ammo = { left: 0, right: 0 };
-    this.pickup = { x: 0.5, y: 0.92, active: false };
+    this.pickup = { x: 0.5, y: 0.5, active: false };
     this.slowedUntil = { left: 0, right: 0 };
     this.nextPickupTime = Date.now() + PICKUP_SPAWN_INTERVAL;
     this.broadcastState();
@@ -227,7 +227,7 @@ export class PongRoom extends DurableObject {
 
     // Spawn pickup if timer elapsed
     if (!this.pickup.active && now >= this.nextPickupTime) {
-      this.pickup = { x: 0.5, y: 0.92, active: true };
+      this.pickup = { x: 0.5, y: 0.2 + Math.random() * 0.6, active: true };
     }
 
     // Update bullets
@@ -284,7 +284,7 @@ export class PongRoom extends DurableObject {
       this.state_ = this.freshState();
       this.bullets = [];
       this.ammo = { left: 0, right: 0 };
-      this.pickup = { x: 0.5, y: 0.92, active: false };
+      this.pickup = { x: 0.5, y: 0.5, active: false };
       this.slowedUntil = { left: 0, right: 0 };
       if (this.players.size === 2) {
         this.startGame();
