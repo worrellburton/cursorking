@@ -1,0 +1,19 @@
+{
+  "name": "cursorking-pong",
+  "main": "worker/pong.ts",
+  "compatibility_date": "2024-12-01",
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "PONG_ROOM",
+        "class_name": "PongRoom"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["PongRoom"]
+    }
+  ]
+}
