@@ -205,14 +205,53 @@ export default function PongGame({ playerName }: { playerName: string }) {
     }
   }, []);
 
+  // Touch handler for mobile
+  const handleTouchMove = useCallback((e: TouchEvent) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    if (!touch) return;
+    mouseRef.current = { x: touch.clientX, y: touch.clientY };
+    const role = myRoleRef.current;
+    if (role === "spectator") return;
+
+    const { w, h } = canvasSizeRef.current;
+    const normalizedX = Math.max(0, Math.min(1, touch.clientX / w));
+    const normalizedY = Math.max(0, Math.min(1, touch.clientY / h));
+
+    let clampedX: number;
+    if (role === "left") {
+      clampedX = Math.max(LEFT_X_MIN, Math.min(LEFT_X_MAX, normalizedX));
+    } else {
+      clampedX = Math.max(RIGHT_X_MIN, Math.min(RIGHT_X_MAX, normalizedX));
+    }
+    const clampedY = Math.max(PADDLE_H_NORM / 2, Math.min(1 - PADDLE_H_NORM / 2, normalizedY));
+    gameStateRef.current.paddles[role] = { x: clampedX, y: clampedY };
+
+    const now = Date.now();
+    if (now - lastSentRef.current < 16) return;
+    lastSentRef.current = now;
+    wsRef.current?.send(JSON.stringify({ type: "paddle-move", x: normalizedX, y: normalizedY }));
+  }, []);
+
+  const handleTouchStart = useCallback((e: TouchEvent) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    if (!touch) return;
+    mouseRef.current = { x: touch.clientX, y: touch.clientY };
+  }, []);
+
   useEffect(() => {
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("click", handleClick);
+    window.addEventListener("touchmove", handleTouchMove, { passive: false });
+    window.addEventListener("touchstart", handleTouchStart, { passive: false });
     return () => {
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("click", handleClick);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchstart", handleTouchStart);
     };
-  }, [handlePointerMove, handleClick]);
+  }, [handlePointerMove, handleClick, handleTouchMove, handleTouchStart]);
 
   useEffect(() => {
     const canvas = canvasRef.current;

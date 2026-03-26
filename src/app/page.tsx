@@ -5,43 +5,23 @@ import SpaceBackground from "@/components/SpaceBackground";
 import PongGame from "@/components/PongGame";
 import MenuCursor from "@/components/MenuCursor";
 
-type Screen = "name" | "start" | "game" | "mobile";
+type Screen = "name" | "start" | "game";
 
 export default function Home() {
   const [playerName, setPlayerName] = useState("");
   const [screen, setScreen] = useState<Screen>("name");
+  const [isMobile, setIsMobile] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [mobilePlayerCount, setMobilePlayerCount] = useState(0);
-  const [mobileMusicPlaying, setMobileMusicPlaying] = useState(false);
 
   useEffect(() => {
-    const isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(
+    const mobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(
       navigator.userAgent
     ) || (window.matchMedia("(pointer: coarse)").matches && window.innerWidth < 1024);
-    if (isMobile) setScreen("mobile");
+    setIsMobile(mobile);
   }, []);
-
-  // Connect to WS on mobile to get player count
-  useEffect(() => {
-    if (screen !== "mobile") return;
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL ?? "wss://cursorking-pong.worrellburton.workers.dev";
-    let ws: WebSocket;
-    function connect() {
-      ws = new WebSocket(wsUrl);
-      ws.onmessage = (e) => {
-        const msg = JSON.parse(e.data);
-        if (msg.type === "player-count") setMobilePlayerCount(msg.count);
-      };
-      ws.onclose = () => setTimeout(connect, 3000);
-      ws.onerror = () => ws.close();
-    }
-    connect();
-    return () => ws?.close();
-  }, [screen]);
 
   const handleNameSubmit = () => {
     if (!playerName.trim()) return;
-    // Pre-load audio on this user gesture to unlock Chrome autoplay
     const audio = new Audio(`${process.env.NODE_ENV === "production" ? "/cursorking" : ""}/music.mp3`);
     audio.volume = 0.5;
     audio.loop = true;
@@ -51,7 +31,6 @@ export default function Home() {
   };
 
   const handleStart = () => {
-    // Play on this user gesture — already unlocked from name submit click
     if (audioRef.current) {
       audioRef.current.play().catch(() => {});
     }
@@ -60,7 +39,7 @@ export default function Home() {
 
   const titleEl = (
     <h1
-      className="text-7xl font-bold tracking-widest text-white sm:text-9xl"
+      className={`font-bold tracking-widest text-white ${isMobile ? "text-5xl" : "text-7xl sm:text-9xl"}`}
       style={{
         fontFamily: "'Courier New', Courier, monospace",
         textShadow:
@@ -87,12 +66,12 @@ export default function Home() {
       className="arena-btn"
       style={{
         fontFamily: "'Courier New', Courier, monospace",
-        fontSize: "1.5rem",
+        fontSize: isMobile ? "1.1rem" : "1.5rem",
         fontWeight: "bold",
         color: enabled ? "#fff" : "rgba(255, 255, 255, 0.12)",
         border: `2px solid ${enabled ? "rgba(255, 160, 50, 0.8)" : "rgba(255, 160, 50, 0.12)"}`,
         borderRadius: "9999px",
-        padding: "16px 56px",
+        padding: isMobile ? "14px 36px" : "16px 56px",
         background: enabled ? "rgba(255, 80, 20, 0.1)" : "transparent",
         cursor: enabled ? "pointer" : "default",
         textShadow: enabled
@@ -123,121 +102,31 @@ export default function Home() {
   );
 
   return (
-    <main className={`relative flex min-h-screen flex-col items-center justify-center overflow-hidden ${screen !== "name" ? "cursor-none" : ""}`}>
+    <main className={`relative flex min-h-screen flex-col items-center justify-center overflow-hidden ${!isMobile && screen !== "name" ? "cursor-none" : ""}`}>
       <SpaceBackground />
-      {screen === "start" && <MenuCursor name={playerName} />}
+      {!isMobile && screen === "start" && <MenuCursor name={playerName} />}
 
-      {screen === "mobile" && (
-        <div className="relative z-10 flex flex-col items-center gap-6 text-center px-8">
-          <h1
-            className="text-5xl font-bold tracking-widest text-white"
-            style={{
-              fontFamily: "'Courier New', Courier, monospace",
-              textShadow:
-                "0 0 20px rgba(34, 211, 238, 0.8), 0 0 40px rgba(34, 211, 238, 0.4)",
-            }}
-          >
-            CURSOR
-            <span
-              style={{
-                color: "#22d3ee",
-                textShadow:
-                  "0 0 20px rgba(34, 211, 238, 1), 0 0 40px rgba(34, 211, 238, 0.6)",
-              }}
-            >
-              KING
-            </span>
-          </h1>
-          <p
-            style={{
-              fontFamily: "'Courier New', Courier, monospace",
-              fontSize: "1rem",
-              color: "rgba(255, 255, 255, 0.6)",
-              letterSpacing: "0.1em",
-              lineHeight: "1.8",
-            }}
-          >
-            SORRY, NOT AVAILABLE ON MOBILE
-          </p>
-          <p
-            style={{
-              fontFamily: "'Courier New', Courier, monospace",
-              fontSize: "0.75rem",
-              color: "rgba(255, 255, 255, 0.3)",
-              letterSpacing: "0.1em",
-            }}
-          >
-            PLEASE VISIT ON A DESKTOP BROWSER
-          </p>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              marginTop: "24px",
-              fontFamily: "'Courier New', monospace",
-              background: "rgba(0, 0, 0, 0.4)",
-              backdropFilter: "blur(8px)",
-              border: "1px solid rgba(34, 197, 94, 0.2)",
-              borderRadius: "9999px",
-              padding: "10px 20px",
-            }}
-          >
-            <span
-              style={{
-                display: "inline-block",
-                width: "10px",
-                height: "10px",
-                borderRadius: "50%",
-                background: "#22c55e",
-                boxShadow: "0 0 8px #22c55e, 0 0 16px rgba(34, 197, 94, 0.5)",
-              }}
-            />
-            <span
-              style={{
-                fontSize: "0.9rem",
-                fontWeight: "bold",
-                color: "#22c55e",
-                textShadow: "0 0 10px rgba(34, 197, 94, 0.8)",
-              }}
-            >
-              {mobilePlayerCount}
-            </span>
-            <span style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.4)" }}>
-              GLOBAL PLAYERS
-            </span>
-          </div>
-          {!mobileMusicPlaying && (
-            <button
-              onClick={() => {
-                const audio = new Audio(`${process.env.NODE_ENV === "production" ? "/cursorking" : ""}/music.mp3`);
-                audio.volume = 0.5;
-                audio.loop = true;
-                audio.play().catch(() => {});
-                audioRef.current = audio;
-                setMobileMusicPlaying(true);
-              }}
-              style={{
-                marginTop: "16px",
-                fontFamily: "'Courier New', monospace",
-                fontSize: "0.7rem",
-                color: "rgba(255, 255, 255, 0.4)",
-                background: "rgba(255, 255, 255, 0.08)",
-                border: "1px solid rgba(255, 255, 255, 0.15)",
-                borderRadius: "9999px",
-                padding: "8px 20px",
-                cursor: "pointer",
-                letterSpacing: "0.15em",
-              }}
-            >
-              ♪ TAP FOR MUSIC
-            </button>
-          )}
+      {/* Mobile badge */}
+      {isMobile && screen !== "game" && (
+        <div
+          className="fixed top-4 left-4 z-50"
+          style={{
+            fontFamily: "'Courier New', monospace",
+            fontSize: "0.6rem",
+            color: "rgba(255, 255, 255, 0.4)",
+            background: "rgba(255, 255, 255, 0.08)",
+            border: "1px solid rgba(255, 255, 255, 0.15)",
+            borderRadius: "9999px",
+            padding: "4px 12px",
+            letterSpacing: "0.15em",
+          }}
+        >
+          MOBILE
         </div>
       )}
 
       {screen === "name" && (
-        <div className="relative z-10 flex items-center justify-center px-4">
+        <div className="relative z-10 flex flex-col items-center gap-4 px-4">
           <div
             style={{
               display: "flex",
@@ -274,6 +163,26 @@ export default function Home() {
               }}
             />
           </div>
+          {/* Submit button for mobile (no Enter key) */}
+          {isMobile && playerName.trim() && (
+            <button
+              onClick={handleNameSubmit}
+              style={{
+                fontFamily: "'Courier New', monospace",
+                fontSize: "0.8rem",
+                fontWeight: "bold",
+                color: "#22d3ee",
+                background: "transparent",
+                border: "1px solid rgba(34, 211, 238, 0.4)",
+                borderRadius: "9999px",
+                padding: "8px 24px",
+                letterSpacing: "0.15em",
+                marginTop: "4px",
+              }}
+            >
+              GO →
+            </button>
+          )}
         </div>
       )}
 
@@ -293,7 +202,7 @@ export default function Home() {
             className="fixed top-4 left-4 z-50"
             style={{
               fontFamily: "'Courier New', Courier, monospace",
-              fontSize: "1.25rem",
+              fontSize: isMobile ? "0.9rem" : "1.25rem",
               fontWeight: "bold",
               color: "white",
               textShadow:
