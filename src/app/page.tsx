@@ -28,7 +28,7 @@ export default function Home() {
     audio.loop = true;
     audio.load();
     audioRef.current = audio;
-    setScreen("howItWorks");
+    setScreen("start");
   };
 
   const handleStart = () => {
@@ -191,6 +191,26 @@ export default function Home() {
             {titleEl}
 
             {pillButton("ENTER THE ARENA", true, handleStart)}
+
+            <button
+              onClick={() => setScreen("howItWorks")}
+              style={{
+                fontFamily: "'Courier New', monospace",
+                fontSize: isMobile ? "0.75rem" : "0.85rem",
+                fontWeight: "bold",
+                color: "rgba(255, 255, 255, 0.35)",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                letterSpacing: "0.15em",
+                marginTop: "-16px",
+                transition: "color 0.3s",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(251, 191, 36, 0.8)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255, 255, 255, 0.35)"; }}
+            >
+              HOW IT WORKS
+            </button>
           </div>
         </>
       )}
