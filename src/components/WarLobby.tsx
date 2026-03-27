@@ -135,6 +135,16 @@ export default function WarLobby({
     setLocked(true);
   };
 
+  const selectRole = (role: Role) => {
+    if (locked) return;
+    // Find open slots for this role across both teams
+    const openSlots = slots.filter(s => s.role === role && !s.taken);
+    if (openSlots.length === 0) return;
+    // Pick a random open team
+    const pick = openSlots[Math.floor(Math.random() * openSlots.length)];
+    selectSlot(pick.team, pick.role);
+  };
+
   const renderSlot = (slot: SlotInfo) => {
     const info = ROLE_INFO[slot.role];
     const isMe = slot.playerId === myIdRef.current;
@@ -419,17 +429,23 @@ export default function WarLobby({
         {ROLES.map(role => {
           const info = ROLE_INFO[role];
           const isSelected = selectedRole?.role === role;
+          const hasOpen = slots.some(s => s.role === role && !s.taken);
+          const canPick = !locked && hasOpen;
           return (
-            <div
+            <button
               key={role}
+              onClick={() => canPick && selectRole(role)}
+              disabled={!canPick}
               style={{
                 width: 120,
                 padding: "10px 8px",
-                background: isSelected ? `${info.color}15` : "rgba(255,255,255,0.02)",
-                border: `1px solid ${isSelected ? info.color + "55" : "rgba(255,255,255,0.06)"}`,
+                background: isSelected ? `${info.color}15` : canPick ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)",
+                border: `1px solid ${isSelected ? info.color + "55" : canPick ? info.color + "33" : "rgba(255,255,255,0.06)"}`,
                 borderRadius: 10,
-                textAlign: "center",
+                textAlign: "center" as const,
                 transition: "all 0.2s",
+                cursor: canPick ? "pointer" : "default",
+                opacity: locked && !isSelected ? 0.4 : 1,
               }}
             >
               <div style={{ fontSize: 20 }}>{info.icon}</div>
@@ -461,7 +477,19 @@ export default function WarLobby({
               }}>
                 {info.desc}
               </div>
-            </div>
+              {canPick && (
+                <div style={{
+                  fontFamily: "Inter, sans-serif",
+                  fontSize: 8,
+                  color: info.color,
+                  marginTop: 4,
+                  letterSpacing: "0.1em",
+                  opacity: 0.7,
+                }}>
+                  CLICK TO LOCK IN
+                </div>
+              )}
+            </button>
           );
         })}
       </div>
