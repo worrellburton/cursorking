@@ -31,31 +31,25 @@ export default function Home() {
   };
 
   const handleStart = () => {
-    if (audioRef.current) {
-      audioRef.current.play().catch(() => {});
+    // Create fresh audio on this user gesture to satisfy autoplay policy
+    if (!audioRef.current) {
+      const audio = new Audio(`${process.env.NODE_ENV === "production" ? "/cursorking" : ""}/music.mp3`);
+      audio.volume = 0.5;
+      audio.loop = true;
+      audioRef.current = audio;
     }
+    audioRef.current.play().catch(() => {});
     setScreen("game");
   };
 
   const titleEl = (
     <h1
-      className={`font-bold tracking-widest text-white ${isMobile ? "text-5xl" : "text-7xl sm:text-9xl"}`}
+      className={`title-fire font-bold tracking-widest ${isMobile ? "text-5xl" : "text-7xl sm:text-9xl"}`}
       style={{
         fontFamily: "'Courier New', Courier, monospace",
-        textShadow:
-          "0 0 20px rgba(34, 211, 238, 0.8), 0 0 40px rgba(34, 211, 238, 0.4), 0 0 80px rgba(34, 211, 238, 0.2)",
       }}
     >
-      CURSOR
-      <span
-        style={{
-          color: "#22d3ee",
-          textShadow:
-            "0 0 20px rgba(34, 211, 238, 1), 0 0 40px rgba(34, 211, 238, 0.6), 0 0 80px rgba(34, 211, 238, 0.3)",
-        }}
-      >
-        KING
-      </span>
+      CURSOR<span className="title-fire-king">KING</span>
     </h1>
   );
 
@@ -199,19 +193,16 @@ export default function Home() {
       {screen === "game" && (
         <>
           <div
-            className="fixed top-4 left-4 z-50"
+            className="fixed top-4 left-4 z-50 title-fire"
             style={{
               fontFamily: "'Courier New', Courier, monospace",
               fontSize: isMobile ? "0.9rem" : "1.25rem",
               fontWeight: "bold",
-              color: "white",
-              textShadow:
-                "0 0 10px rgba(34, 211, 238, 0.6), 0 0 20px rgba(34, 211, 238, 0.3)",
               letterSpacing: "0.15em",
               pointerEvents: "none",
             }}
           >
-            CURSOR<span style={{ color: "#22d3ee" }}>KING</span>
+            CURSOR<span className="title-fire-king">KING</span>
           </div>
           <PongGame playerName={playerName} isMobile={isMobile} />
         </>
@@ -232,6 +223,31 @@ export default function Home() {
           font-family: 'Courier New', Courier, monospace;
           font-weight: bold;
           letter-spacing: 0.15em;
+        }
+        @keyframes title-fire-anim {
+          0%, 100% {
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255, 200, 50, 0.8), 0 0 20px rgba(255, 120, 20, 0.6), 0 0 40px rgba(255, 60, 10, 0.4), 0 0 80px rgba(200, 30, 0, 0.2);
+          }
+          25% {
+            color: #ffe0a0;
+            text-shadow: 0 0 15px rgba(255, 220, 80, 0.9), 0 0 30px rgba(255, 160, 40, 0.7), 0 0 50px rgba(255, 80, 10, 0.5), 0 0 90px rgba(200, 30, 0, 0.3);
+          }
+          50% {
+            color: #ffd080;
+            text-shadow: 0 0 20px rgba(255, 240, 100, 1), 0 0 40px rgba(255, 180, 50, 0.8), 0 0 60px rgba(255, 100, 20, 0.5), 0 0 100px rgba(200, 40, 0, 0.3);
+          }
+          75% {
+            color: #ffe8b0;
+            text-shadow: 0 0 12px rgba(255, 200, 60, 0.85), 0 0 25px rgba(255, 140, 30, 0.65), 0 0 45px rgba(255, 70, 10, 0.45), 0 0 85px rgba(200, 30, 0, 0.25);
+          }
+        }
+        .title-fire {
+          animation: title-fire-anim 2s ease-in-out infinite;
+        }
+        .title-fire-king {
+          animation: title-fire-anim 2s ease-in-out infinite 0.3s;
+          color: #22d3ee;
         }
       `}</style>
     </main>
