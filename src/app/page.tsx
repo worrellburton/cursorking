@@ -146,10 +146,13 @@ export default function Home() {
   };
 
   const handleWarExit = () => {
-    warWs?.close();
-    setWarWs(null);
+    // Server reset to lobby — close old WS and go back to war lobby
+    if (warWs) {
+      warWs.close();
+      setWarWs(null);
+    }
     setWarMyId("");
-    setScreen("start");
+    setScreen("warLobby");
   };
 
   const pillButton = (label: string, enabled: boolean, onClick: () => void) => (

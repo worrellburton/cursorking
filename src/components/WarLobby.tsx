@@ -7,12 +7,14 @@ const WS_URL =
 
 type Team = "top" | "bottom";
 type Role = "king" | "sniper" | "orb" | "healer" | "gunner";
+const ROLES: Role[] = ["king", "sniper", "orb", "healer", "gunner"];
 
 type SlotInfo = {
   team: Team;
   role: Role;
   taken: boolean;
   playerName: string;
+  playerId: string | null;
 };
 
 type LobbyState = {
@@ -22,12 +24,12 @@ type LobbyState = {
   countdown: number | null;
 };
 
-const ROLE_INFO: Record<Role, { label: string; icon: string; color: string; desc: string }> = {
-  king:   { label: "KING",   icon: "👑", color: "#ffd700", desc: "If your King dies, you lose. Slow shot, 10x damage to Orb." },
-  sniper: { label: "SNIPER", icon: "🎯", color: "#ff4444", desc: "Charged shot bounces off walls. Full charge = instant kill." },
-  orb:    { label: "ORB",    icon: "🔮", color: "#aa66ff", desc: "1000 HP shield. Slow moving, absorbs damage. Can't shoot." },
-  healer: { label: "HEALER", icon: "💚", color: "#44ff88", desc: "Left click heals, right click empowers nearest ally." },
-  gunner: { label: "GUNNER", icon: "🔫", color: "#ff8800", desc: "Fast movement, rapid-fire machine gun." },
+const ROLE_INFO: Record<Role, { label: string; icon: string; color: string; desc: string; hp: number; ability: string }> = {
+  king:   { label: "KING",   icon: "👑", color: "#ffd700", hp: 100, desc: "If your King dies, you lose.", ability: "Slow shot (5s cooldown), 10x damage to Orb. Empowered = instant recharge." },
+  sniper: { label: "SNIPER", icon: "🎯", color: "#ff4444", hp: 100, desc: "Hold to charge, release to fire.", ability: "Shot bounces off walls. Full charge = instant kill. Empowered = super bullet." },
+  orb:    { label: "ORB",    icon: "🔮", color: "#aa66ff", hp: 1000, desc: "Slow-moving shield that absorbs damage.", ability: "Blocks bullets for allies. Can't shoot. Empowered = grows bigger." },
+  healer: { label: "HEALER", icon: "💚", color: "#44ff88", hp: 100, desc: "Support role that keeps the team alive.", ability: "Left click = heal nearest ally. Right click = empower nearest ally." },
+  gunner: { label: "GUNNER", icon: "🔫", color: "#ff8800", hp: 100, desc: "Fast and aggressive.", ability: "Rapid-fire machine gun. Fastest movement. Empowered = double fire rate." },
 };
 
 export default function WarLobby({
@@ -42,10 +44,13 @@ export default function WarLobby({
   const wsRef = useRef<WebSocket | null>(null);
   const myIdRef = useRef("");
   const [lobby, setLobby] = useState<LobbyState | null>(null);
-  const [mySlot, setMySlot] = useState<{ team: Team; role: Role } | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [selectedRole, setSelectedRole] = useState<{ team: Team; role: Role } | null>(null);
+  const handedOffRef = useRef(false);
 
   useEffect(() => {
+    handedOffRef.current = false;
+
     const ws = new WebSocket(`${WS_URL}/war`);
     wsRef.current = ws;
 
@@ -62,8 +67,15 @@ export default function WarLobby({
 
       if (msg.type === "war-lobby") {
         setLobby(msg);
-        if (msg.countdown !== null) {
-          setCountdown(msg.countdown);
+        setCountdown(msg.countdown);
+        // Sync selected role from server state
+        if (myIdRef.current) {
+          const mySlot = msg.slots.find((s: SlotInfo) => s.playerId === myIdRef.current);
+          if (mySlot) {
+            setSelectedRole({ team: mySlot.team, role: mySlot.role });
+          } else {
+            setSelectedRole(null);
+          }
         }
       }
 
@@ -72,7 +84,8 @@ export default function WarLobby({
       }
 
       if (msg.type === "war-start") {
-        // Game is starting — hand off WebSocket to the game component
+        handedOffRef.current = true;
+        wsRef.current = null; // prevent cleanup from closing
         onGameStart(ws, myIdRef.current);
       }
     };
@@ -82,8 +95,7 @@ export default function WarLobby({
     };
 
     return () => {
-      // Only close if game hasn't started (ws handed off)
-      if (wsRef.current === ws) {
+      if (!handedOffRef.current && wsRef.current === ws) {
         ws.close();
       }
     };
@@ -92,18 +104,17 @@ export default function WarLobby({
   const selectSlot = (team: Team, role: Role) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
     wsRef.current.send(JSON.stringify({ type: "select-slot", team, role }));
-    setMySlot({ team, role });
   };
 
   const renderSlot = (slot: SlotInfo) => {
     const info = ROLE_INFO[slot.role];
-    const isMe = mySlot?.team === slot.team && mySlot?.role === slot.role;
+    const isMe = slot.playerId === myIdRef.current;
     const taken = slot.taken;
 
     return (
       <button
         key={`${slot.team}-${slot.role}`}
-        onClick={() => !taken && selectSlot(slot.team, slot.role)}
+        onClick={() => selectSlot(slot.team, slot.role)}
         disabled={taken && !isMe}
         style={{
           display: "flex",
@@ -182,13 +193,13 @@ export default function WarLobby({
   return (
     <div
       className="fixed inset-0 z-20 flex flex-col items-center justify-center"
-      style={{ background: "rgba(0, 0, 0, 0.85)", backdropFilter: "blur(8px)" }}
+      style={{ background: "rgba(0, 0, 0, 0.9)", backdropFilter: "blur(8px)", overflowY: "auto" }}
     >
       {/* Back button */}
       <button
         onClick={onBack}
         style={{
-          position: "absolute",
+          position: "fixed",
           top: 24,
           left: 24,
           fontFamily: "Inter, sans-serif",
@@ -200,6 +211,7 @@ export default function WarLobby({
           borderRadius: 8,
           padding: "6px 16px",
           cursor: "pointer",
+          zIndex: 30,
         }}
       >
         ← BACK
@@ -226,14 +238,14 @@ export default function WarLobby({
           fontSize: 12,
           color: "rgba(255,255,255,0.4)",
           letterSpacing: "0.15em",
-          marginBottom: 32,
+          marginBottom: 24,
         }}
       >
         CHOOSE YOUR ROLE — KILL THE ENEMY KING TO WIN
       </p>
 
       {/* Teams */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 28, alignItems: "center" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 24, alignItems: "center" }}>
         {renderTeam("top")}
 
         <div
@@ -254,7 +266,7 @@ export default function WarLobby({
       {/* Status */}
       <div
         style={{
-          marginTop: 32,
+          marginTop: 24,
           fontFamily: "Inter, sans-serif",
           fontSize: 14,
           fontWeight: "bold",
@@ -272,22 +284,108 @@ export default function WarLobby({
         )}
       </div>
 
-      {/* Role description for selected slot */}
-      {mySlot && (
+      {/* Role card for selected slot */}
+      {selectedRole && (
         <div
           style={{
-            marginTop: 16,
-            fontFamily: "Inter, sans-serif",
-            fontSize: 11,
-            color: "rgba(255,255,255,0.4)",
-            maxWidth: 400,
+            marginTop: 20,
+            padding: "16px 24px",
+            background: "rgba(255,255,255,0.04)",
+            border: `1px solid ${ROLE_INFO[selectedRole.role].color}44`,
+            borderRadius: 12,
+            maxWidth: 420,
             textAlign: "center",
-            lineHeight: 1.5,
           }}
         >
-          {ROLE_INFO[mySlot.role].desc}
+          <div style={{
+            fontFamily: "Inter, sans-serif",
+            fontSize: 13,
+            fontWeight: "bold",
+            color: ROLE_INFO[selectedRole.role].color,
+            letterSpacing: "0.1em",
+            marginBottom: 6,
+          }}>
+            {ROLE_INFO[selectedRole.role].icon} {ROLE_INFO[selectedRole.role].label} — {ROLE_INFO[selectedRole.role].hp} HP
+          </div>
+          <div style={{
+            fontFamily: "Inter, sans-serif",
+            fontSize: 11,
+            color: "rgba(255,255,255,0.5)",
+            lineHeight: 1.5,
+            marginBottom: 4,
+          }}>
+            {ROLE_INFO[selectedRole.role].desc}
+          </div>
+          <div style={{
+            fontFamily: "Inter, sans-serif",
+            fontSize: 10,
+            color: "rgba(255,255,255,0.35)",
+            lineHeight: 1.5,
+          }}>
+            {ROLE_INFO[selectedRole.role].ability}
+          </div>
         </div>
       )}
+
+      {/* Role cards overview */}
+      <div style={{
+        marginTop: 24,
+        display: "flex",
+        gap: 10,
+        flexWrap: "wrap",
+        justifyContent: "center",
+        maxWidth: 700,
+        padding: "0 16px",
+      }}>
+        {ROLES.map(role => {
+          const info = ROLE_INFO[role];
+          const isSelected = selectedRole?.role === role;
+          return (
+            <div
+              key={role}
+              style={{
+                width: 120,
+                padding: "10px 8px",
+                background: isSelected ? `${info.color}15` : "rgba(255,255,255,0.02)",
+                border: `1px solid ${isSelected ? info.color + "55" : "rgba(255,255,255,0.06)"}`,
+                borderRadius: 10,
+                textAlign: "center",
+                transition: "all 0.2s",
+              }}
+            >
+              <div style={{ fontSize: 20 }}>{info.icon}</div>
+              <div style={{
+                fontFamily: "Inter, sans-serif",
+                fontSize: 10,
+                fontWeight: "bold",
+                color: info.color,
+                letterSpacing: "0.1em",
+                marginTop: 4,
+              }}>
+                {info.label}
+              </div>
+              <div style={{
+                fontFamily: "Inter, sans-serif",
+                fontSize: 8,
+                color: "rgba(255,255,255,0.35)",
+                marginTop: 4,
+                lineHeight: 1.4,
+              }}>
+                {info.hp} HP
+              </div>
+              <div style={{
+                fontFamily: "Inter, sans-serif",
+                fontSize: 8,
+                color: "rgba(255,255,255,0.25)",
+                marginTop: 2,
+                lineHeight: 1.4,
+              }}>
+                {info.desc}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

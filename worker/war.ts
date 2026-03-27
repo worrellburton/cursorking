@@ -137,6 +137,7 @@ export class WarRoom extends DurableObject {
   bullets: Bullet[] = [];
   slots: Slot[] = [];
   interval: ReturnType<typeof setInterval> | null = null;
+  countdownTimer: ReturnType<typeof setTimeout> | null = null;
   nextBulletId = 0;
   winner: Team | null = null;
   countdownValue = 0;
@@ -188,6 +189,7 @@ export class WarRoom extends DurableObject {
   }
 
   startCountdown() {
+    if (this.phase === "countdown") return; // already counting
     this.phase = "countdown";
     this.countdownValue = COUNTDOWN_SECS;
     this.broadcastLobby();
@@ -195,13 +197,23 @@ export class WarRoom extends DurableObject {
     const tick = () => {
       this.countdownValue--;
       if (this.countdownValue <= 0) {
+        this.countdownTimer = null;
         this.startGame();
       } else {
         this.broadcast(JSON.stringify({ type: "war-countdown", value: this.countdownValue }));
-        setTimeout(tick, 1000);
+        this.countdownTimer = setTimeout(tick, 1000);
       }
     };
-    setTimeout(tick, 1000);
+    this.countdownTimer = setTimeout(tick, 1000);
+  }
+
+  cancelCountdown() {
+    if (this.countdownTimer) {
+      clearTimeout(this.countdownTimer);
+      this.countdownTimer = null;
+    }
+    this.phase = "lobby";
+    this.broadcastLobby();
   }
 
   // ---- Game start ----
@@ -253,6 +265,15 @@ export class WarRoom extends DurableObject {
     }
   }
 
+  resetToLobby() {
+    this.phase = "lobby";
+    this.players.clear();
+    this.bullets = [];
+    this.winner = null;
+    this.initSlots();
+    this.broadcastLobby();
+  }
+
   // ---- Tick ----
 
   tick() {
@@ -278,12 +299,13 @@ export class WarRoom extends DurableObject {
     this.checkWin();
 
     // 5. Broadcast
-    this.broadcastState();
+    if (this.phase === "playing") {
+      this.broadcastState();
+    }
   }
 
   movePlayer(p: Player) {
     if (p.role === "orb") {
-      // Orb lerps toward target
       const lerpFactor = p.empowered ? ORB_LERP * 0.7 : ORB_LERP;
       p.x += (p.targetX - p.x) * lerpFactor;
       p.y += (p.targetY - p.y) * lerpFactor;
@@ -300,41 +322,29 @@ export class WarRoom extends DurableObject {
         p.y = p.targetY;
       }
     }
-    // Clamp to bounds
     const r = p.role === "orb" ? p.orbSize : PLAYER_RADIUS[p.role];
     p.x = Math.max(r, Math.min(1 - r, p.x));
     p.y = Math.max(r, Math.min(1 - r, p.y));
   }
 
   handleAbilities(p: Player, now: number) {
-    // Check empower expiry
     if (p.empowered && now >= p.empowerEnd) {
       p.empowered = false;
       if (p.role === "orb") {
-        p.orbSize = PLAYER_RADIUS.orb; // reset size
+        p.orbSize = PLAYER_RADIUS.orb;
       }
     }
 
     switch (p.role) {
-      case "king":
-        this.handleKing(p, now);
-        break;
-      case "sniper":
-        this.handleSniper(p, now);
-        break;
-      case "gunner":
-        this.handleGunner(p, now);
-        break;
-      case "healer":
-        this.handleHealer(p, now);
-        break;
-      // orb has no abilities
+      case "king": this.handleKing(p, now); break;
+      case "sniper": this.handleSniper(p, now); break;
+      case "gunner": this.handleGunner(p, now); break;
+      case "healer": this.handleHealer(p, now); break;
     }
   }
 
   handleKing(p: Player, now: number) {
     if (p.mouseDown && now - p.lastShot >= (p.empowered ? 0 : KING_SHOT_CD)) {
-      // Fire toward cursor
       const dx = p.targetX - p.x;
       const dy = p.targetY - p.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
@@ -342,34 +352,24 @@ export class WarRoom extends DurableObject {
         const speed = BULLET_SPEED.king;
         this.bullets.push({
           id: this.nextBulletId++,
-          x: p.x,
-          y: p.y,
-          vx: (dx / dist) * speed,
-          vy: (dy / dist) * speed,
-          ownerId: p.id,
-          team: p.team,
-          sourceRole: "king",
-          damage: DMG_KING,
-          damageToOrb: DMG_KING_TO_ORB,
-          bounces: 0,
-          maxBounces: 0,
-          isSuper: false,
-          penetrating: false,
-          hitIds: [],
+          x: p.x, y: p.y,
+          vx: (dx / dist) * speed, vy: (dy / dist) * speed,
+          ownerId: p.id, team: p.team, sourceRole: "king",
+          damage: DMG_KING, damageToOrb: DMG_KING_TO_ORB,
+          bounces: 0, maxBounces: 0,
+          isSuper: false, penetrating: false, hitIds: [],
         });
         p.lastShot = now;
-        p.mouseDown = false; // single shot per click
+        p.mouseDown = false;
       }
     }
   }
 
   handleSniper(p: Player, now: number) {
-    // Start charging on mouseDown
     if (p.mouseDown && !p.charging) {
       p.charging = true;
       p.chargeStart = now;
     }
-    // Release: fire
     if (!p.mouseDown && p.charging) {
       p.charging = false;
       const chargeTime = Math.min(now - p.chargeStart, SNIPER_CHARGE_TIME);
@@ -395,20 +395,12 @@ export class WarRoom extends DurableObject {
 
         this.bullets.push({
           id: this.nextBulletId++,
-          x: p.x,
-          y: p.y,
-          vx: (dx / dist) * speed,
-          vy: (dy / dist) * speed,
-          ownerId: p.id,
-          team: p.team,
-          sourceRole: "sniper",
-          damage,
-          damageToOrb,
-          bounces: 0,
-          maxBounces: SNIPER_MAX_BOUNCES,
-          isSuper,
-          penetrating: isSuper,
-          hitIds: [],
+          x: p.x, y: p.y,
+          vx: (dx / dist) * speed, vy: (dy / dist) * speed,
+          ownerId: p.id, team: p.team, sourceRole: "sniper",
+          damage, damageToOrb,
+          bounces: 0, maxBounces: SNIPER_MAX_BOUNCES,
+          isSuper, penetrating: isSuper, hitIds: [],
         });
       }
     }
@@ -424,45 +416,33 @@ export class WarRoom extends DurableObject {
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist > 0.01) {
       const speed = BULLET_SPEED.gunner;
-      // Add small spread
       const spread = (Math.random() - 0.5) * 0.08;
       const angle = Math.atan2(dy, dx) + spread;
       this.bullets.push({
         id: this.nextBulletId++,
-        x: p.x,
-        y: p.y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        ownerId: p.id,
-        team: p.team,
-        sourceRole: "gunner",
-        damage: DMG_GUNNER,
-        damageToOrb: DMG_GUNNER,
-        bounces: 0,
-        maxBounces: 0,
-        isSuper: false,
-        penetrating: false,
-        hitIds: [],
+        x: p.x, y: p.y,
+        vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+        ownerId: p.id, team: p.team, sourceRole: "gunner",
+        damage: DMG_GUNNER, damageToOrb: DMG_GUNNER,
+        bounces: 0, maxBounces: 0,
+        isSuper: false, penetrating: false, hitIds: [],
       });
       p.lastShot = now;
     }
   }
 
   handleHealer(p: Player, now: number) {
-    // Find closest alive ally (not self)
     const closest = this.findClosestAlly(p);
     if (!closest) return;
 
-    // Left click: heal
     if (p.mouseDown && closest.hp < MAX_HP[closest.role]) {
       closest.hp = Math.min(MAX_HP[closest.role], closest.hp + HEAL_PER_TICK);
     }
 
-    // Right click: empower
     if (p.rightDown && now >= p.empowerCdEnd) {
       this.empowerTarget(closest, now);
       p.empowerCdEnd = now + EMPOWER_COOLDOWN;
-      p.rightDown = false; // single activation per click
+      p.rightDown = false;
     }
   }
 
@@ -474,10 +454,7 @@ export class WarRoom extends DurableObject {
       const dx = other.x - p.x;
       const dy = other.y - p.y;
       const d = dx * dx + dy * dy;
-      if (d < bestDist) {
-        bestDist = d;
-        best = other;
-      }
+      if (d < bestDist) { bestDist = d; best = other; }
     }
     return best;
   }
@@ -485,19 +462,14 @@ export class WarRoom extends DurableObject {
   empowerTarget(target: Player, now: number) {
     target.empowered = true;
     target.empowerEnd = now + EMPOWER_DURATION;
-
     switch (target.role) {
-      case "king":
-        target.lastShot = 0; // instant recharge
-        break;
-      case "orb":
-        target.orbSize = PLAYER_RADIUS.orb + ORB_EMPOWER_GROWTH;
-        break;
-      case "sniper":
-        target.hasSuperBullet = true;
-        break;
-      // gunner: empowered flag makes fire rate faster (handled in handleGunner)
+      case "king": target.lastShot = 0; break;
+      case "orb": target.orbSize = PLAYER_RADIUS.orb + ORB_EMPOWER_GROWTH; break;
+      case "sniper": target.hasSuperBullet = true; break;
     }
+    this.broadcast(JSON.stringify({
+      type: "war-empower", targetId: target.id, targetRole: target.role,
+    }));
   }
 
   // ---- Bullets ----
@@ -510,22 +482,25 @@ export class WarRoom extends DurableObject {
 
       // Wall bouncing (for sniper)
       if (b.maxBounces > 0) {
+        let bounced = false;
         if (b.x <= 0 || b.x >= 1) {
           b.vx = -b.vx;
           b.x = Math.max(0, Math.min(1, b.x));
-          b.bounces++;
+          bounced = true;
         }
         if (b.y <= 0 || b.y >= 1) {
           b.vy = -b.vy;
           b.y = Math.max(0, Math.min(1, b.y));
-          b.bounces++;
+          bounced = true;
         }
-        if (b.bounces > b.maxBounces) {
-          this.bullets.splice(i, 1);
-          continue;
+        if (bounced) {
+          b.bounces++;
+          if (b.bounces > b.maxBounces) {
+            this.bullets.splice(i, 1);
+            continue;
+          }
         }
       } else {
-        // Non-bouncing bullets die off screen
         if (b.x < -0.05 || b.x > 1.05 || b.y < -0.05 || b.y > 1.05) {
           this.bullets.splice(i, 1);
           continue;
@@ -544,18 +519,20 @@ export class WarRoom extends DurableObject {
         const dist = Math.sqrt(dx * dx + dy * dy);
 
         if (dist < r + BULLET_RADIUS) {
-          // Hit!
           const dmg = p.role === "orb" ? b.damageToOrb : b.damage;
           p.hp -= dmg;
+
+          this.broadcast(JSON.stringify({
+            type: "war-hit", victimId: p.id, damage: dmg,
+          }));
+
           if (p.hp <= 0) {
             p.hp = 0;
             p.alive = false;
             this.broadcast(JSON.stringify({
               type: "war-kill",
-              killerId: b.ownerId,
-              victimId: p.id,
-              victimRole: p.role,
-              victimTeam: p.team,
+              killerId: b.ownerId, victimId: p.id,
+              victimRole: p.role, victimTeam: p.team,
             }));
           }
 
@@ -568,10 +545,6 @@ export class WarRoom extends DurableObject {
           }
         }
       }
-
-      // Also check if Orb blocks bullets for allies behind it
-      // (Orb absorbs damage — bullets hitting the orb don't pass through)
-      // This is already handled above since we check orb collision first
       if (removed) continue;
     }
   }
@@ -587,20 +560,10 @@ export class WarRoom extends DurableObject {
         this.stopGame();
         this.broadcastState();
         this.broadcast(JSON.stringify({
-          type: "war-over",
-          winner: this.winner,
+          type: "war-over", winner: this.winner,
         }));
 
-        // Reset to lobby after delay
-        setTimeout(() => {
-          this.phase = "lobby";
-          this.players.clear();
-          this.bullets = [];
-          this.winner = null;
-          this.initSlots();
-          // Re-assign connected players back to lobby
-          this.broadcastLobby();
-        }, 8000);
+        setTimeout(() => this.resetToLobby(), 8000);
         return;
       }
     }
@@ -619,10 +582,10 @@ export class WarRoom extends DurableObject {
       type: "war-lobby",
       phase: this.phase,
       slots: this.slots.map(s => ({
-        team: s.team,
-        role: s.role,
+        team: s.team, role: s.role,
         taken: s.playerId !== null,
         playerName: s.playerName,
+        playerId: s.playerId,
       })),
       playerCount: this.sockets.size,
       countdown: this.phase === "countdown" ? this.countdownValue : null,
@@ -639,34 +602,24 @@ export class WarRoom extends DurableObject {
     }
 
     const playersArr = [...this.players.values()].map(p => ({
-      id: p.id,
-      name: p.name,
-      team: p.team,
-      role: p.role,
-      x: p.x,
-      y: p.y,
-      hp: p.hp,
-      maxHp: MAX_HP[p.role],
+      id: p.id, name: p.name, team: p.team, role: p.role,
+      x: p.x, y: p.y, hp: p.hp, maxHp: MAX_HP[p.role],
       alive: p.alive,
       charging: p.role === "sniper" && p.charging
-        ? Math.min(1, (Date.now() - p.chargeStart) / SNIPER_CHARGE_TIME)
-        : 0,
+        ? Math.min(1, (Date.now() - p.chargeStart) / SNIPER_CHARGE_TIME) : 0,
       orbSize: p.role === "orb" ? p.orbSize : 0,
       empowered: p.empowered,
       radius: p.role === "orb" ? p.orbSize : PLAYER_RADIUS[p.role],
     }));
 
     const bulletsArr = this.bullets.map(b => ({
-      id: b.id,
-      x: b.x,
-      y: b.y,
-      team: b.team,
-      sourceRole: b.sourceRole,
-      isSuper: b.isSuper,
+      id: b.id, x: b.x, y: b.y,
+      team: b.team, sourceRole: b.sourceRole, isSuper: b.isSuper,
     }));
 
     this.broadcast(JSON.stringify({
       type: "war-state",
+      phase: this.phase,
       players: playersArr,
       bullets: bulletsArr,
       healBeams,
@@ -689,13 +642,27 @@ export class WarRoom extends DurableObject {
     const id = this.genId();
     this.sockets.set(id, server);
 
-    server.send(JSON.stringify({ type: "war-welcome", id }));
+    server.send(JSON.stringify({ type: "war-welcome", id, phase: this.phase }));
 
     if (this.phase === "lobby" || this.phase === "countdown") {
+      // Send lobby state to the new connection
+      server.send(JSON.stringify({
+        type: "war-lobby",
+        phase: this.phase,
+        slots: this.slots.map(s => ({
+          team: s.team, role: s.role,
+          taken: s.playerId !== null,
+          playerName: s.playerName,
+          playerId: s.playerId,
+        })),
+        playerCount: this.sockets.size,
+        countdown: this.phase === "countdown" ? this.countdownValue : null,
+      }));
+      // Also broadcast updated player count to everyone
       this.broadcastLobby();
-    } else if (this.phase === "playing") {
-      // Late join: spectator only
+    } else if (this.phase === "playing" || this.phase === "over") {
       server.send(JSON.stringify({ type: "war-spectator" }));
+      this.broadcastState();
     }
 
     return new Response(null, { status: 101, webSocket: client });
@@ -705,7 +672,6 @@ export class WarRoom extends DurableObject {
     if (typeof message !== "string") return;
     const data = JSON.parse(message);
 
-    // Find player ID for this socket
     let senderId = "";
     for (const [id, sock] of this.sockets) {
       if (sock === ws) { senderId = id; break; }
@@ -714,6 +680,12 @@ export class WarRoom extends DurableObject {
 
     if (data.type === "set-name") {
       this.names.set(senderId, String(data.name).slice(0, 12));
+      // Update name in any claimed slot
+      for (const s of this.slots) {
+        if (s.playerId === senderId) {
+          s.playerName = this.names.get(senderId) ?? "";
+        }
+      }
       return;
     }
 
@@ -758,7 +730,6 @@ export class WarRoom extends DurableObject {
         break;
       }
     }
-
     if (!disconnectedId) return;
 
     // Remove from lobby slots
@@ -774,14 +745,17 @@ export class WarRoom extends DurableObject {
     if (player) {
       player.alive = false;
       player.hp = 0;
+      this.broadcast(JSON.stringify({
+        type: "war-kill",
+        killerId: "disconnect", victimId: disconnectedId,
+        victimRole: player.role, victimTeam: player.team,
+      }));
     }
 
-    if (this.phase === "lobby" || this.phase === "countdown") {
-      // Cancel countdown if someone leaves
-      if (this.phase === "countdown") {
-        this.phase = "lobby";
-      }
+    if (this.phase === "lobby") {
       this.broadcastLobby();
+    } else if (this.phase === "countdown") {
+      this.cancelCountdown();
     } else if (this.phase === "playing") {
       this.checkWin();
     }
