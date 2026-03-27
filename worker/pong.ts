@@ -52,6 +52,10 @@ export class PongRoom extends DurableObject {
     left: { x: 0.04, y: 0.5 },
     right: { x: 0.96, y: 0.5 },
   };
+  prevPaddles: { left: PaddleState; right: PaddleState } = {
+    left: { x: 0.04, y: 0.5 },
+    right: { x: 0.96, y: 0.5 },
+  };
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -124,6 +128,7 @@ export class PongRoom extends DurableObject {
     this.ammo = { left: 0, right: 0 };
     this.pickup = { x: 0.5, y: 0.5, active: false };
     this.slowedUntil = { left: 0, right: 0 };
+    this.prevPaddles = { left: { ...this.state_.paddles.left }, right: { ...this.state_.paddles.right } };
     this.nextPickupTime = Date.now() + PICKUP_SPAWN_INTERVAL;
     this.broadcastState();
 
@@ -288,6 +293,65 @@ export class PongRoom extends DurableObject {
       }
       ball.vy = speed * Math.sin(angle);
     }
+
+    // Paddle-ball push: if paddle moved into ball, push ball with momentum
+    const PUSH_FORCE = 1.5; // momentum transfer multiplier
+    for (const side of ["left", "right"] as const) {
+      const p = paddles[side];
+      const prev = this.prevPaddles[side];
+      const pLeft = p.x - PADDLE_WIDTH / 2;
+      const pRight = p.x + PADDLE_WIDTH / 2;
+      const pTop = p.y - PADDLE_HEIGHT / 2;
+      const pBottom = p.y + PADDLE_HEIGHT / 2;
+
+      // Check if ball overlaps this paddle
+      if (
+        ball.x + BALL_SIZE > pLeft &&
+        ball.x - BALL_SIZE < pRight &&
+        ball.y + BALL_SIZE > pTop &&
+        ball.y - BALL_SIZE < pBottom
+      ) {
+        // Paddle velocity this tick
+        const pvx = p.x - prev.x;
+        const pvy = p.y - prev.y;
+
+        // Push ball out along the shortest axis
+        const overlapLeft = (ball.x + BALL_SIZE) - pLeft;
+        const overlapRight = pRight - (ball.x - BALL_SIZE);
+        const overlapTop = (ball.y + BALL_SIZE) - pTop;
+        const overlapBottom = pBottom - (ball.y - BALL_SIZE);
+        const minOverlap = Math.min(overlapLeft, overlapRight, overlapTop, overlapBottom);
+
+        if (minOverlap === overlapLeft) {
+          ball.x = pLeft - BALL_SIZE;
+        } else if (minOverlap === overlapRight) {
+          ball.x = pRight + BALL_SIZE;
+        } else if (minOverlap === overlapTop) {
+          ball.y = pTop - BALL_SIZE;
+        } else {
+          ball.y = pBottom + BALL_SIZE;
+        }
+
+        // Transfer paddle momentum to ball
+        const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+        ball.vx += pvx * PUSH_FORCE;
+        ball.vy += pvy * PUSH_FORCE;
+
+        // Maintain minimum speed so ball doesn't stall
+        const newSpeed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+        if (newSpeed < speed * 0.5) {
+          const scale = (speed * 0.5) / Math.max(newSpeed, 0.001);
+          ball.vx *= scale;
+          ball.vy *= scale;
+        }
+      }
+    }
+
+    // Store current paddle positions for next tick's momentum calc
+    this.prevPaddles = {
+      left: { ...paddles.left },
+      right: { ...paddles.right },
+    };
 
     // Spawn pickup if timer elapsed
     if (!this.pickup.active && now >= this.nextPickupTime) {
