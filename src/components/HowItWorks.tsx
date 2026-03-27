@@ -10,7 +10,7 @@ export default function HowItWorks({ onContinue, isMobile }: { onContinue: () =>
     setTimeout(() => setVisible(true), 100);
   }, []);
 
-  const totalSteps = 4;
+  const totalSteps = 5;
 
   const next = () => {
     if (step < totalSteps - 1) setStep(step + 1);
@@ -35,7 +35,7 @@ export default function HowItWorks({ onContinue, isMobile }: { onContinue: () =>
         <div className="hiw-step flex flex-col items-center gap-6 text-center">
           <h2
             style={{
-              fontFamily: "'Courier New', monospace",
+              fontFamily: "Inter, sans-serif",
               fontSize: headingSize,
               fontWeight: "bold",
               letterSpacing: "0.1em",
@@ -45,56 +45,56 @@ export default function HowItWorks({ onContinue, isMobile }: { onContinue: () =>
             HOW IT WORKS
           </h2>
 
-          <p style={{ fontFamily: "'Courier New', monospace", fontSize, color: "rgba(255,255,255,0.7)", lineHeight: 1.6 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize, color: "rgba(255,255,255,0.7)", lineHeight: 1.6 }}>
             Enter the tournament for <span style={{ color: "#22d3ee", fontWeight: "bold" }}>$1</span>
           </p>
 
           {/* Animated pie chart */}
           <div style={{ position: "relative", width: 200, height: 200 }}>
             <svg viewBox="0 0 200 200" width="200" height="200">
-              {/* 70% Win/Lose Pool */}
+              {/* 70% Win/Lose Pool — starts at top (12 o'clock) */}
               <circle
                 cx="100" cy="100" r="80"
                 fill="none"
                 stroke="#22d3ee"
                 strokeWidth="24"
-                strokeDasharray={`${0.7 * 502.65} ${0.3 * 502.65}`}
+                strokeDasharray="351.86 150.80"
                 strokeDashoffset="0"
                 transform="rotate(-90 100 100)"
                 className="hiw-ring"
                 style={{ filter: "drop-shadow(0 0 8px #22d3ee)" }}
               />
-              {/* 15% King's Cup */}
+              {/* 15% King's Cup — starts after 70% */}
               <circle
                 cx="100" cy="100" r="80"
                 fill="none"
                 stroke="#fbbf24"
                 strokeWidth="24"
-                strokeDasharray={`${0.15 * 502.65} ${0.85 * 502.65}`}
-                strokeDashoffset={`${-0.7 * 502.65}`}
+                strokeDasharray="75.40 427.26"
+                strokeDashoffset="-351.86"
                 transform="rotate(-90 100 100)"
                 className="hiw-ring"
                 style={{ filter: "drop-shadow(0 0 8px #fbbf24)", animationDelay: "0.2s" }}
               />
-              {/* 15% CursorKing Team */}
+              {/* 15% CursorKing Team — starts after 85% */}
               <circle
                 cx="100" cy="100" r="80"
                 fill="none"
                 stroke="#f43f5e"
                 strokeWidth="24"
-                strokeDasharray={`${0.15 * 502.65} ${0.85 * 502.65}`}
-                strokeDashoffset={`${-0.85 * 502.65}`}
+                strokeDasharray="75.40 427.26"
+                strokeDashoffset="-427.26"
                 transform="rotate(-90 100 100)"
                 className="hiw-ring"
                 style={{ filter: "drop-shadow(0 0 8px #f43f5e)", animationDelay: "0.4s" }}
               />
-              <text x="100" y="95" textAnchor="middle" fill="white" fontFamily="'Courier New', monospace" fontWeight="bold" fontSize="22">$1</text>
-              <text x="100" y="115" textAnchor="middle" fill="rgba(255,255,255,0.5)" fontFamily="'Courier New', monospace" fontSize="11">ENTRY</text>
+              <text x="100" y="95" textAnchor="middle" fill="white" fontFamily="Inter, sans-serif" fontWeight="bold" fontSize="22">$1</text>
+              <text x="100" y="115" textAnchor="middle" fill="rgba(255,255,255,0.5)" fontFamily="Inter, sans-serif" fontSize="11">ENTRY</text>
             </svg>
           </div>
 
           {/* Legend */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, fontFamily: "'Courier New', monospace", fontSize: subSize }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, fontFamily: "Inter, sans-serif", fontSize: subSize }}>
             <div className="hiw-legend-item" style={{ animationDelay: "0.3s" }}>
               <span style={{ display: "inline-block", width: 12, height: 12, borderRadius: 2, background: "#22d3ee", marginRight: 8, boxShadow: "0 0 6px #22d3ee" }} />
               <span style={{ color: "#22d3ee", fontWeight: "bold" }}>70%</span>
@@ -119,7 +119,7 @@ export default function HowItWorks({ onContinue, isMobile }: { onContinue: () =>
         <div className="hiw-step flex flex-col items-center gap-6 text-center">
           <h2
             style={{
-              fontFamily: "'Courier New', monospace",
+              fontFamily: "Inter, sans-serif",
               fontSize: headingSize,
               fontWeight: "bold",
               letterSpacing: "0.1em",
@@ -130,7 +130,7 @@ export default function HowItWorks({ onContinue, isMobile }: { onContinue: () =>
             BRACKET TOURNAMENT
           </h2>
 
-          <p style={{ fontFamily: "'Courier New', monospace", fontSize, color: "rgba(255,255,255,0.7)", lineHeight: 1.6 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize, color: "rgba(255,255,255,0.7)", lineHeight: 1.6 }}>
             Win your match. Advance. Repeat.
           </p>
 
@@ -139,16 +139,16 @@ export default function HowItWorks({ onContinue, isMobile }: { onContinue: () =>
             <svg viewBox="0 0 400 220" width="100%" height="100%">
               {/* Round 1 */}
               <rect x="10" y="20" width="80" height="28" rx="4" fill="rgba(34,211,238,0.15)" stroke="#22d3ee" strokeWidth="1" className="hiw-bracket-node" style={{ animationDelay: "0s" }} />
-              <text x="50" y="39" textAnchor="middle" fill="#22d3ee" fontSize="10" fontFamily="'Courier New', monospace">PLAYER 1</text>
+              <text x="50" y="39" textAnchor="middle" fill="#22d3ee" fontSize="10" fontFamily="Inter, sans-serif">PLAYER 1</text>
 
               <rect x="10" y="60" width="80" height="28" rx="4" fill="rgba(244,63,94,0.15)" stroke="#f43f5e" strokeWidth="1" className="hiw-bracket-node" style={{ animationDelay: "0.1s" }} />
-              <text x="50" y="79" textAnchor="middle" fill="#f43f5e" fontSize="10" fontFamily="'Courier New', monospace">PLAYER 2</text>
+              <text x="50" y="79" textAnchor="middle" fill="#f43f5e" fontSize="10" fontFamily="Inter, sans-serif">PLAYER 2</text>
 
               <rect x="10" y="120" width="80" height="28" rx="4" fill="rgba(34,211,238,0.15)" stroke="#22d3ee" strokeWidth="1" className="hiw-bracket-node" style={{ animationDelay: "0.2s" }} />
-              <text x="50" y="139" textAnchor="middle" fill="#22d3ee" fontSize="10" fontFamily="'Courier New', monospace">PLAYER 3</text>
+              <text x="50" y="139" textAnchor="middle" fill="#22d3ee" fontSize="10" fontFamily="Inter, sans-serif">PLAYER 3</text>
 
               <rect x="10" y="160" width="80" height="28" rx="4" fill="rgba(244,63,94,0.15)" stroke="#f43f5e" strokeWidth="1" className="hiw-bracket-node" style={{ animationDelay: "0.3s" }} />
-              <text x="50" y="179" textAnchor="middle" fill="#f43f5e" fontSize="10" fontFamily="'Courier New', monospace">PLAYER 4</text>
+              <text x="50" y="179" textAnchor="middle" fill="#f43f5e" fontSize="10" fontFamily="Inter, sans-serif">PLAYER 4</text>
 
               {/* Lines R1 -> R2 */}
               <path d="M90,34 L130,34 L130,54 L160,54" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="1" className="hiw-bracket-line" style={{ animationDelay: "0.4s" }} />
@@ -158,10 +158,10 @@ export default function HowItWorks({ onContinue, isMobile }: { onContinue: () =>
 
               {/* Round 2 */}
               <rect x="160" y="40" width="80" height="28" rx="4" fill="rgba(34,211,238,0.2)" stroke="#22d3ee" strokeWidth="1.5" className="hiw-bracket-node" style={{ animationDelay: "0.6s" }} />
-              <text x="200" y="59" textAnchor="middle" fill="#22d3ee" fontSize="10" fontFamily="'Courier New', monospace" fontWeight="bold">WINNER</text>
+              <text x="200" y="59" textAnchor="middle" fill="#22d3ee" fontSize="10" fontFamily="Inter, sans-serif" fontWeight="bold">WINNER</text>
 
               <rect x="160" y="140" width="80" height="28" rx="4" fill="rgba(34,211,238,0.2)" stroke="#22d3ee" strokeWidth="1.5" className="hiw-bracket-node" style={{ animationDelay: "0.7s" }} />
-              <text x="200" y="159" textAnchor="middle" fill="#22d3ee" fontSize="10" fontFamily="'Courier New', monospace" fontWeight="bold">WINNER</text>
+              <text x="200" y="159" textAnchor="middle" fill="#22d3ee" fontSize="10" fontFamily="Inter, sans-serif" fontWeight="bold">WINNER</text>
 
               {/* Lines R2 -> Final */}
               <path d="M240,54 L280,54 L280,104 L310,104" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="1" className="hiw-bracket-line" style={{ animationDelay: "0.9s" }} />
@@ -169,14 +169,14 @@ export default function HowItWorks({ onContinue, isMobile }: { onContinue: () =>
 
               {/* Final - KING */}
               <rect x="310" y="86" width="80" height="36" rx="6" fill="rgba(251,191,36,0.2)" stroke="#fbbf24" strokeWidth="2" className="hiw-bracket-king" style={{ animationDelay: "1.1s" }} />
-              <text x="350" y="108" textAnchor="middle" fill="#fbbf24" fontSize="12" fontFamily="'Courier New', monospace" fontWeight="bold">KING</text>
+              <text x="350" y="108" textAnchor="middle" fill="#fbbf24" fontSize="12" fontFamily="Inter, sans-serif" fontWeight="bold">KING</text>
 
               {/* Crown icon */}
               <text x="350" y="82" textAnchor="middle" fontSize="16" className="hiw-crown">&#x1F451;</text>
             </svg>
           </div>
 
-          <p style={{ fontFamily: "'Courier New', monospace", fontSize: subSize, color: "rgba(255,255,255,0.5)", maxWidth: 320 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: subSize, color: "rgba(255,255,255,0.5)", maxWidth: 320 }}>
             Win your match to earn from the pool. Lose and you&apos;re out.
           </p>
         </div>
@@ -187,7 +187,7 @@ export default function HowItWorks({ onContinue, isMobile }: { onContinue: () =>
         <div className="hiw-step flex flex-col items-center gap-6 text-center">
           <h2
             style={{
-              fontFamily: "'Courier New', monospace",
+              fontFamily: "Inter, sans-serif",
               fontSize: headingSize,
               fontWeight: "bold",
               letterSpacing: "0.1em",
@@ -198,37 +198,25 @@ export default function HowItWorks({ onContinue, isMobile }: { onContinue: () =>
             KING OF THE HILL
           </h2>
 
-          <p style={{ fontFamily: "'Courier New', monospace", fontSize, color: "rgba(255,255,255,0.7)", lineHeight: 1.6, maxWidth: 380 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize, color: "rgba(255,255,255,0.7)", lineHeight: 1.6, maxWidth: 380 }}>
             The tournament winner becomes the <span style={{ color: "#fbbf24", fontWeight: "bold" }}>KING</span>
           </p>
 
-          {/* Animated crown + timer */}
-          <div style={{ position: "relative", width: 240, height: 200 }}>
-            {/* Glow ring */}
-            <div className="hiw-king-ring" style={{
-              position: "absolute", top: 20, left: 20, width: 200, height: 200,
-              borderRadius: "50%",
-              border: "2px solid rgba(251,191,36,0.3)",
-              boxShadow: "0 0 30px rgba(251,191,36,0.2), inset 0 0 30px rgba(251,191,36,0.1)",
-            }} />
-
-            <div style={{
-              position: "absolute", top: 50, left: 0, width: 240, textAlign: "center",
-              fontFamily: "'Courier New', monospace",
+          {/* Crown + timer — stacked column, no overlap */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+            <div style={{ fontSize: "3rem" }} className="hiw-crown-bounce">&#x1F451;</div>
+            <div style={{ fontSize: "1.2rem", color: "#fbbf24", fontWeight: "bold", textShadow: "0 0 10px rgba(251,191,36,0.5)" }}>THE KING</div>
+            <div className="hiw-timer" style={{
+              fontSize: "2rem", fontWeight: "bold",
+              color: "#22d3ee", textShadow: "0 0 15px rgba(34,211,238,0.5)",
+              marginTop: 8,
             }}>
-              <div style={{ fontSize: "3rem" }} className="hiw-crown-bounce">&#x1F451;</div>
-              <div style={{ fontSize: "1.2rem", color: "#fbbf24", fontWeight: "bold", marginTop: 4, textShadow: "0 0 10px rgba(251,191,36,0.5)" }}>THE KING</div>
-              <div className="hiw-timer" style={{
-                marginTop: 12, fontSize: "1.8rem", fontWeight: "bold",
-                color: "#22d3ee", textShadow: "0 0 15px rgba(34,211,238,0.5)",
-              }}>
-                12:34
-              </div>
-              <div style={{ fontSize: subSize, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>TIME ON THRONE</div>
+              12:34
             </div>
+            <div style={{ fontSize: subSize, color: "rgba(255,255,255,0.4)" }}>TIME ON THRONE</div>
           </div>
 
-          <p style={{ fontFamily: "'Courier New', monospace", fontSize: subSize, color: "rgba(255,255,255,0.5)", maxWidth: 320, lineHeight: 1.5 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: subSize, color: "rgba(255,255,255,0.5)", maxWidth: 320, lineHeight: 1.5, marginTop: 8 }}>
             The longer you reign, the more time you accumulate.
             More time = bigger share of the <span style={{ color: "#fbbf24" }}>KING&apos;S CUP</span>
           </p>
@@ -240,7 +228,7 @@ export default function HowItWorks({ onContinue, isMobile }: { onContinue: () =>
         <div className="hiw-step flex flex-col items-center gap-6 text-center">
           <h2
             style={{
-              fontFamily: "'Courier New', monospace",
+              fontFamily: "Inter, sans-serif",
               fontSize: headingSize,
               fontWeight: "bold",
               letterSpacing: "0.1em",
@@ -251,12 +239,12 @@ export default function HowItWorks({ onContinue, isMobile }: { onContinue: () =>
             DAILY KING&apos;S CUP
           </h2>
 
-          <p style={{ fontFamily: "'Courier New', monospace", fontSize, color: "rgba(255,255,255,0.7)", lineHeight: 1.6, maxWidth: 380 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize, color: "rgba(255,255,255,0.7)", lineHeight: 1.6, maxWidth: 380 }}>
             Every day, the King&apos;s Cup pays out
           </p>
 
           {/* Animated payout bars */}
-          <div style={{ width: isMobile ? 280 : 340, display: "flex", flexDirection: "column", gap: 10, fontFamily: "'Courier New', monospace" }}>
+          <div style={{ width: isMobile ? 280 : 340, display: "flex", flexDirection: "column", gap: 10, fontFamily: "Inter, sans-serif" }}>
             <div className="hiw-bar-row" style={{ animationDelay: "0.2s" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 100 }}>
                 <span style={{ fontSize: "1.2rem" }}>&#x1F451;</span>
@@ -291,9 +279,98 @@ export default function HowItWorks({ onContinue, isMobile }: { onContinue: () =>
             </div>
           </div>
 
-          <p style={{ fontFamily: "'Courier New', monospace", fontSize: subSize, color: "rgba(255,255,255,0.5)", maxWidth: 340, lineHeight: 1.5 }}>
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: subSize, color: "rgba(255,255,255,0.5)", maxWidth: 340, lineHeight: 1.5 }}>
             Your payout is proportional to your time as King.
             Reign longer = earn more from the daily cup.
+          </p>
+        </div>
+      )}
+
+      {/* Step 4: Example payout assumptions */}
+      {step === 4 && (
+        <div className="hiw-step flex flex-col items-center gap-6 text-center">
+          <h2
+            style={{
+              fontFamily: "Inter, sans-serif",
+              fontSize: headingSize,
+              fontWeight: "bold",
+              letterSpacing: "0.05em",
+              color: "#22d3ee",
+              textShadow: "0 0 15px rgba(34,211,238,0.6)",
+            }}
+          >
+            EXAMPLE PAYOUTS
+          </h2>
+
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: subSize, color: "rgba(255,255,255,0.5)", maxWidth: 360 }}>
+            If <span style={{ color: "#22d3ee", fontWeight: "bold" }}>100 players</span> enter today at $1 each:
+          </p>
+
+          {/* Breakdown table */}
+          <div style={{ width: isMobile ? 300 : 380, fontFamily: "Inter, sans-serif", fontSize: subSize }}>
+            {/* Total pool */}
+            <div className="hiw-bar-row" style={{ animationDelay: "0.1s", padding: "10px 16px", background: "rgba(255,255,255,0.05)", borderRadius: 8, marginBottom: 8 }}>
+              <span style={{ color: "rgba(255,255,255,0.6)", flex: 1 }}>Total Entry Pool</span>
+              <span style={{ color: "#fff", fontWeight: "bold", fontSize: "1.1rem" }}>$100</span>
+            </div>
+
+            {/* Split */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
+              <div className="hiw-bar-row" style={{ animationDelay: "0.3s", padding: "8px 16px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
+                  <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 2, background: "#22d3ee" }} />
+                  <span style={{ color: "rgba(255,255,255,0.6)" }}>Win/Lose Pool (70%)</span>
+                </div>
+                <span style={{ color: "#22d3ee", fontWeight: "bold" }}>$70</span>
+              </div>
+
+              <div className="hiw-bar-row" style={{ animationDelay: "0.5s", padding: "8px 16px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
+                  <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 2, background: "#fbbf24" }} />
+                  <span style={{ color: "rgba(255,255,255,0.6)" }}>King&apos;s Cup (15%)</span>
+                </div>
+                <span style={{ color: "#fbbf24", fontWeight: "bold" }}>$15</span>
+              </div>
+
+              <div className="hiw-bar-row" style={{ animationDelay: "0.7s", padding: "8px 16px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
+                  <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 2, background: "#f43f5e" }} />
+                  <span style={{ color: "rgba(255,255,255,0.6)" }}>CursorKing Team (15%)</span>
+                </div>
+                <span style={{ color: "#f43f5e", fontWeight: "bold" }}>$15</span>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div style={{ height: 1, background: "rgba(255,255,255,0.1)", margin: "12px 0" }} />
+
+            {/* Winner payouts */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div className="hiw-bar-row" style={{ animationDelay: "0.9s", padding: "8px 16px" }}>
+                <span style={{ color: "rgba(255,255,255,0.5)", flex: 1 }}>Each match winner earns</span>
+                <span style={{ color: "#22d3ee", fontWeight: "bold" }}>~$1.40</span>
+              </div>
+              <div className="hiw-bar-row" style={{ animationDelay: "1.1s", padding: "8px 16px" }}>
+                <span style={{ color: "rgba(255,255,255,0.5)", flex: 1 }}>Each match loser loses</span>
+                <span style={{ color: "#f43f5e", fontWeight: "bold" }}>$1.00</span>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div style={{ height: 1, background: "rgba(255,255,255,0.1)", margin: "12px 0" }} />
+
+            {/* King's Cup example */}
+            <div className="hiw-bar-row" style={{ animationDelay: "1.3s", padding: "10px 16px", background: "rgba(251,191,36,0.08)", borderRadius: 8 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ color: "#fbbf24", fontWeight: "bold" }}>&#x1F451; Daily King&apos;s Cup</div>
+                <div style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.7rem", marginTop: 2 }}>Split by time as King</div>
+              </div>
+              <span style={{ color: "#fbbf24", fontWeight: "bold", fontSize: "1.2rem" }}>$15</span>
+            </div>
+          </div>
+
+          <p style={{ fontFamily: "Inter, sans-serif", fontSize: "0.7rem", color: "rgba(255,255,255,0.3)", maxWidth: 300, lineHeight: 1.4, marginTop: 4 }}>
+            Numbers scale with players. More entries = bigger pools.
           </p>
         </div>
       )}
@@ -304,7 +381,7 @@ export default function HowItWorks({ onContinue, isMobile }: { onContinue: () =>
           onClick={next}
           className="arena-btn"
           style={{
-            fontFamily: "'Courier New', monospace",
+            fontFamily: "Inter, sans-serif",
             fontSize: isMobile ? "1rem" : "1.2rem",
             fontWeight: "bold",
             color: "#fff",
@@ -343,7 +420,7 @@ export default function HowItWorks({ onContinue, isMobile }: { onContinue: () =>
           <button
             onClick={() => setStep(step - 1)}
             style={{
-              fontFamily: "'Courier New', monospace",
+              fontFamily: "Inter, sans-serif",
               fontSize: "0.75rem",
               color: "rgba(255,255,255,0.3)",
               background: "none",
@@ -409,13 +486,6 @@ export default function HowItWorks({ onContinue, isMobile }: { onContinue: () =>
         .hiw-crown-bounce {
           animation: hiw-crown-float 2s ease-in-out infinite;
           display: inline-block;
-        }
-        .hiw-king-ring {
-          animation: hiw-ring-rotate 8s linear infinite;
-        }
-        @keyframes hiw-ring-rotate {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
         }
         .hiw-timer {
           animation: hiw-timer-tick 1s step-end infinite;

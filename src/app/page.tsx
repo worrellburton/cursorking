@@ -47,7 +47,7 @@ export default function Home() {
     <h1
       className={`title-fire font-bold tracking-widest ${isMobile ? "text-5xl" : "text-7xl sm:text-9xl"}`}
       style={{
-        fontFamily: "'Courier New', Courier, monospace",
+        fontFamily: "Inter, sans-serif",
       }}
     >
       CURSOR<span className="title-fire-king">KING</span>
@@ -60,7 +60,7 @@ export default function Home() {
       disabled={!enabled}
       className="arena-btn"
       style={{
-        fontFamily: "'Courier New', Courier, monospace",
+        fontFamily: "Inter, sans-serif",
         fontSize: isMobile ? "1.1rem" : "1.5rem",
         fontWeight: "bold",
         color: enabled ? "#fff" : "rgba(255, 255, 255, 0.12)",
@@ -106,7 +106,7 @@ export default function Home() {
         <div
           className="fixed top-4 left-4 z-50"
           style={{
-            fontFamily: "'Courier New', monospace",
+            fontFamily: "Inter, sans-serif",
             fontSize: "0.6rem",
             color: "rgba(255, 255, 255, 0.4)",
             background: "rgba(255, 255, 255, 0.08)",
@@ -143,7 +143,7 @@ export default function Home() {
               maxLength={12}
               autoFocus
               style={{
-                fontFamily: "'Courier New', Courier, monospace",
+                fontFamily: "Inter, sans-serif",
                 fontSize: "1.1rem",
                 fontWeight: "bold",
                 color: "#ffffff",
@@ -163,7 +163,7 @@ export default function Home() {
             <button
               onClick={handleNameSubmit}
               style={{
-                fontFamily: "'Courier New', monospace",
+                fontFamily: "Inter, sans-serif",
                 fontSize: "0.8rem",
                 fontWeight: "bold",
                 color: "#22d3ee",
@@ -187,30 +187,43 @@ export default function Home() {
 
       {screen === "start" && (
         <>
-          <div className="relative z-10 flex flex-col items-center gap-10 text-center px-4">
+          <div className="relative z-10 flex flex-col items-center gap-6 text-center px-4">
             {titleEl}
 
-            {pillButton("ENTER THE ARENA", true, handleStart)}
+            <div className="flex flex-col items-center gap-4" style={{ marginTop: 16 }}>
+              {pillButton("ENTER THE ARENA", true, handleStart)}
 
-            <button
-              onClick={() => setScreen("howItWorks")}
-              style={{
-                fontFamily: "'Courier New', monospace",
-                fontSize: isMobile ? "0.75rem" : "0.85rem",
-                fontWeight: "bold",
-                color: "rgba(255, 255, 255, 0.35)",
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                letterSpacing: "0.15em",
-                marginTop: "-16px",
-                transition: "color 0.3s",
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(251, 191, 36, 0.8)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255, 255, 255, 0.35)"; }}
-            >
-              HOW IT WORKS
-            </button>
+              <button
+                onClick={() => setScreen("howItWorks")}
+                className="arena-btn"
+                style={{
+                  fontFamily: "Inter, sans-serif",
+                  fontSize: isMobile ? "0.7rem" : "0.8rem",
+                  fontWeight: "bold",
+                  color: "#fff",
+                  border: "1.5px solid rgba(255, 160, 50, 0.8)",
+                  borderRadius: "9999px",
+                  padding: isMobile ? "8px 24px" : "10px 32px",
+                  background: "rgba(255, 80, 20, 0.1)",
+                  cursor: "pointer",
+                  textShadow: "0 0 10px rgba(255, 200, 50, 1), 0 0 20px rgba(255, 120, 20, 0.8), 0 0 40px rgba(255, 60, 10, 0.5)",
+                  boxShadow: "0 0 15px rgba(255, 120, 20, 0.4), 0 0 30px rgba(255, 60, 10, 0.2), inset 0 0 15px rgba(255, 120, 20, 0.1)",
+                  letterSpacing: "0.15em",
+                  animation: "fire-glow 1.5s ease-in-out infinite",
+                  transition: "all 0.3s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(255, 80, 20, 0.25)";
+                  e.currentTarget.style.boxShadow = "0 0 25px rgba(255, 160, 50, 0.6), 0 0 50px rgba(255, 80, 20, 0.4), 0 0 80px rgba(255, 40, 0, 0.2), inset 0 0 25px rgba(255, 120, 20, 0.15)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(255, 80, 20, 0.1)";
+                  e.currentTarget.style.boxShadow = "0 0 15px rgba(255, 120, 20, 0.4), 0 0 30px rgba(255, 60, 10, 0.2), inset 0 0 15px rgba(255, 120, 20, 0.1)";
+                }}
+              >
+                HOW IT WORKS
+              </button>
+            </div>
           </div>
         </>
       )}
@@ -220,7 +233,7 @@ export default function Home() {
           <div
             className="fixed top-4 left-4 z-50 title-fire"
             style={{
-              fontFamily: "'Courier New', Courier, monospace",
+              fontFamily: "Inter, sans-serif",
               fontSize: isMobile ? "0.9rem" : "1.25rem",
               fontWeight: "bold",
               letterSpacing: "0.15em",
@@ -245,7 +258,7 @@ export default function Home() {
         }
         .name-input::placeholder {
           color: rgba(255, 255, 255, 0.4);
-          font-family: 'Courier New', Courier, monospace;
+          font-family: Inter, sans-serif;
           font-weight: bold;
           letter-spacing: 0.15em;
         }
