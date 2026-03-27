@@ -297,9 +297,11 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
       const mob = isMobile;
 
       // Helper: transform server normalized coords to screen pixels
+      // On mobile, always rotate (default to "left" for spectators)
+      const mobRole = mob ? (role === "left" || role === "right" ? role : "left") : null;
       function toScreen(sx: number, sy: number): { x: number; y: number } {
-        if (mob && (role === "left" || role === "right")) {
-          const s = serverToScreen(sx, sy, role);
+        if (mobRole) {
+          const s = serverToScreen(sx, sy, mobRole);
           return { x: s.x * W, y: s.y * H };
         }
         return { x: sx * W, y: sy * H };
