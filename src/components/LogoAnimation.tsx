@@ -117,7 +117,9 @@ export default function LogoAnimation({
     }
 
     let animId: number;
+    let stopped = false;
     function draw() {
+      if (stopped) return;
       const now = performance.now();
       const elapsed = now - startTime;
       ctx.clearRect(0, 0, W, H);
@@ -193,11 +195,13 @@ export default function LogoAnimation({
           }
         }
       } else {
-        // Animation complete
+        // Animation complete — stop the loop
         if (phaseRef.current !== "done") {
           setPhase("done");
         }
         onComplete();
+        stopped = true;
+        return;
       }
 
       animId = requestAnimationFrame(draw);
@@ -206,6 +210,7 @@ export default function LogoAnimation({
     draw();
 
     return () => {
+      stopped = true;
       cancelAnimationFrame(animId);
       window.removeEventListener("resize", onResize);
     };

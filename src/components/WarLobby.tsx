@@ -265,17 +265,6 @@ export default function WarLobby({
         </div>
       ))}
 
-      {/* My cursor */}
-      <style>{`
-        .war-lobby-cursor {
-          position: fixed;
-          pointer-events: none;
-          z-index: 60;
-          transform: translate(-2px, -2px);
-        }
-      `}</style>
-      <div className="war-lobby-cursor" id="my-war-cursor" />
-
       {/* Back button */}
       <button
         onClick={onBack}

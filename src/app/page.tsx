@@ -198,7 +198,10 @@ export default function Home() {
   );
 
   return (
-    <main className={`relative flex min-h-screen flex-col items-center justify-center overflow-hidden ${!isMobile && screen !== "name" ? "cursor-none" : ""}`}>
+    <main
+      className={`relative flex min-h-screen flex-col items-center justify-center overflow-hidden ${!isMobile && screen !== "name" ? "cursor-none" : ""}`}
+      style={{ background: "#050510" }}
+    >
       <SpaceBackground />
       {!isMobile && (screen === "start" || screen === "howItWorks") && <MenuCursor name={playerName} />}
 
@@ -264,15 +267,31 @@ export default function Home() {
 
       {screen === "name" && (
         <div className="relative z-10 flex flex-col items-center gap-4 px-4">
+          {/* Prompt label on mobile so users know to tap */}
+          {isMobile && (
+            <div
+              style={{
+                fontFamily: "Inter, sans-serif",
+                fontSize: "0.75rem",
+                fontWeight: "bold",
+                color: "rgba(255, 255, 255, 0.5)",
+                letterSpacing: "0.2em",
+                marginBottom: -4,
+              }}
+            >
+              TAP TO ENTER NAME
+            </div>
+          )}
           <div
             style={{
               display: "flex",
               alignItems: "center",
               background: "rgba(255, 255, 255, 0.12)",
-              border: "2px solid rgba(255, 255, 255, 0.5)",
+              border: "2px solid rgba(255, 255, 255, 0.6)",
               borderRadius: "9999px",
-              padding: "12px 32px",
+              padding: isMobile ? "14px 24px" : "12px 32px",
               backdropFilter: "blur(8px)",
+              boxShadow: "0 0 20px rgba(255, 255, 255, 0.08)",
             }}
           >
             <input
@@ -284,16 +303,17 @@ export default function Home() {
               placeholder="PLAYER NAME"
               maxLength={12}
               autoFocus
+              enterKeyHint="go"
               style={{
                 fontFamily: "Inter, sans-serif",
-                fontSize: "1.1rem",
+                fontSize: isMobile ? "1rem" : "1.1rem",
                 fontWeight: "bold",
                 color: "#ffffff",
                 border: "none",
                 padding: "8px 0",
                 background: "transparent",
                 outline: "none",
-                width: "280px",
+                width: isMobile ? "220px" : "280px",
                 caretColor: "#ffffff",
                 textAlign: "center",
                 letterSpacing: "0.15em",
@@ -305,15 +325,16 @@ export default function Home() {
               onClick={handleNameSubmit}
               style={{
                 fontFamily: "Inter, sans-serif",
-                fontSize: "0.8rem",
+                fontSize: "0.9rem",
                 fontWeight: "bold",
                 color: "#22d3ee",
-                background: "transparent",
-                border: "1px solid rgba(34, 211, 238, 0.4)",
+                background: "rgba(34, 211, 238, 0.08)",
+                border: "2px solid rgba(34, 211, 238, 0.5)",
                 borderRadius: "9999px",
-                padding: "8px 24px",
+                padding: "12px 32px",
                 letterSpacing: "0.15em",
                 marginTop: "4px",
+                boxShadow: "0 0 15px rgba(34, 211, 238, 0.2)",
               }}
             >
               GO →
@@ -516,7 +537,7 @@ export default function Home() {
           }
         }
         .name-input::placeholder {
-          color: rgba(255, 255, 255, 0.4);
+          color: rgba(255, 255, 255, 0.55);
           font-family: Inter, sans-serif;
           font-weight: bold;
           letter-spacing: 0.15em;

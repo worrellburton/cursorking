@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from "react";
 
-const STAR_COUNT = 500;
 const SHOOTING_STAR_CHANCE = 0.003;
 
 export default function SpaceBackground() {
@@ -15,6 +14,12 @@ export default function SpaceBackground() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // Detect mobile for performance scaling
+    const mob = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+      || (window.matchMedia("(pointer: coarse)").matches && window.innerWidth < 1024);
+
+    const starCount = mob ? 120 : 500;
+
     function resize() {
       if (!canvas) return;
       canvas.width = window.innerWidth;
@@ -24,7 +29,7 @@ export default function SpaceBackground() {
     window.addEventListener("resize", resize);
 
     // Stars
-    const stars = Array.from({ length: STAR_COUNT }, () => ({
+    const stars = Array.from({ length: starCount }, () => ({
       x: Math.random(),
       y: Math.random(),
       z: Math.random(),
@@ -32,7 +37,7 @@ export default function SpaceBackground() {
       speed: 0.0001 + Math.random() * 0.0005,
       twinkleSpeed: 1 + Math.random() * 4,
       twinkleOffset: Math.random() * Math.PI * 2,
-      hue: 200 + Math.random() * 40, // blue-ish white range
+      hue: 200 + Math.random() * 40,
     }));
 
     // Shooting stars
@@ -46,8 +51,8 @@ export default function SpaceBackground() {
     };
     const shootingStars: ShootingStar[] = [];
 
-    // Nebula blobs
-    const nebulae = Array.from({ length: 4 }, () => ({
+    // Nebula blobs (skip on mobile)
+    const nebulae = mob ? [] : Array.from({ length: 4 }, () => ({
       x: Math.random(),
       y: Math.random(),
       r: 0.1 + Math.random() * 0.15,
@@ -69,7 +74,7 @@ export default function SpaceBackground() {
       ctx.fillStyle = "#050510";
       ctx.fillRect(0, 0, W, H);
 
-      // Nebula layers
+      // Nebula layers (desktop only)
       for (const n of nebulae) {
         const nx = (n.x + Math.sin(time * 0.1 + n.phase) * 0.02) * W;
         const ny = (n.y + Math.cos(time * 0.08 + n.phase) * 0.02) * H;
@@ -86,7 +91,6 @@ export default function SpaceBackground() {
 
       // Stars
       for (const star of stars) {
-        // Slow drift
         star.y -= star.speed;
         if (star.y < -0.01) {
           star.y = 1.01;
@@ -99,8 +103,8 @@ export default function SpaceBackground() {
         const sx = star.x * W;
         const sy = star.y * H;
 
-        // Glow
-        if (star.z > 0.7) {
+        // Glow (desktop only, bright stars only)
+        if (!mob && star.z > 0.7) {
           const glowR = size * 4;
           const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, glowR);
           glow.addColorStop(0, `hsla(${star.hue}, 30%, 90%, ${alpha * 0.3})`);
@@ -117,8 +121,8 @@ export default function SpaceBackground() {
         ctx.fill();
       }
 
-      // Spawn shooting stars
-      if (Math.random() < SHOOTING_STAR_CHANCE) {
+      // Shooting stars (reduced chance on mobile)
+      if (Math.random() < (mob ? 0.001 : SHOOTING_STAR_CHANCE)) {
         const angle = -Math.PI / 6 + Math.random() * -Math.PI / 6;
         const speed = 4 + Math.random() * 4;
         shootingStars.push({
@@ -131,7 +135,6 @@ export default function SpaceBackground() {
         });
       }
 
-      // Draw shooting stars
       for (let i = shootingStars.length - 1; i >= 0; i--) {
         const ss = shootingStars[i];
         ss.x += ss.vx;
@@ -146,35 +149,42 @@ export default function SpaceBackground() {
         const progress = ss.life / ss.maxLife;
         const alpha = progress < 0.3 ? progress / 0.3 : 1 - (progress - 0.3) / 0.7;
         const tailLen = 40 + (1 - progress) * 40;
-
-        const grad = ctx.createLinearGradient(
-          ss.x, ss.y,
-          ss.x - ss.vx * tailLen / Math.sqrt(ss.vx * ss.vx + ss.vy * ss.vy),
-          ss.y + ss.vy * tailLen / Math.sqrt(ss.vx * ss.vx + ss.vy * ss.vy),
-        );
-        grad.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
-        grad.addColorStop(0.3, `rgba(200, 220, 255, ${alpha * 0.5})`);
-        grad.addColorStop(1, "transparent");
-
-        ctx.strokeStyle = grad;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(ss.x, ss.y);
         const norm = Math.sqrt(ss.vx * ss.vx + ss.vy * ss.vy);
-        ctx.lineTo(
-          ss.x - (ss.vx / norm) * tailLen,
-          ss.y + (ss.vy / norm) * tailLen,
-        );
-        ctx.stroke();
 
-        // Head glow
-        const headGlow = ctx.createRadialGradient(ss.x, ss.y, 0, ss.x, ss.y, 6);
-        headGlow.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
-        headGlow.addColorStop(1, "transparent");
-        ctx.fillStyle = headGlow;
-        ctx.beginPath();
-        ctx.arc(ss.x, ss.y, 6, 0, Math.PI * 2);
-        ctx.fill();
+        if (mob) {
+          // Simple line on mobile (no gradients)
+          ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(ss.x, ss.y);
+          ctx.lineTo(ss.x - (ss.vx / norm) * tailLen, ss.y + (ss.vy / norm) * tailLen);
+          ctx.stroke();
+        } else {
+          const grad = ctx.createLinearGradient(
+            ss.x, ss.y,
+            ss.x - ss.vx * tailLen / norm,
+            ss.y + ss.vy * tailLen / norm,
+          );
+          grad.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
+          grad.addColorStop(0.3, `rgba(200, 220, 255, ${alpha * 0.5})`);
+          grad.addColorStop(1, "transparent");
+
+          ctx.strokeStyle = grad;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(ss.x, ss.y);
+          ctx.lineTo(ss.x - (ss.vx / norm) * tailLen, ss.y + (ss.vy / norm) * tailLen);
+          ctx.stroke();
+
+          // Head glow
+          const headGlow = ctx.createRadialGradient(ss.x, ss.y, 0, ss.x, ss.y, 6);
+          headGlow.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
+          headGlow.addColorStop(1, "transparent");
+          ctx.fillStyle = headGlow;
+          ctx.beginPath();
+          ctx.arc(ss.x, ss.y, 6, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
 
       animId = requestAnimationFrame(draw);
@@ -192,7 +202,7 @@ export default function SpaceBackground() {
     <canvas
       ref={canvasRef}
       className="pointer-events-none fixed inset-0 z-0"
-      style={{ width: "100vw", height: "100vh" }}
+      style={{ width: "100vw", height: "100vh", background: "#050510" }}
     />
   );
 }

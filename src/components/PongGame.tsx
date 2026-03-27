@@ -354,6 +354,23 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // Polyfill roundRect for older mobile browsers
+    if (!ctx.roundRect) {
+      CanvasRenderingContext2D.prototype.roundRect = function(x: number, y: number, w: number, h: number, r: number | number[]) {
+        const radius = typeof r === "number" ? r : (r[0] ?? 0);
+        this.moveTo(x + radius, y);
+        this.lineTo(x + w - radius, y);
+        this.arcTo(x + w, y, x + w, y + radius, radius);
+        this.lineTo(x + w, y + h - radius);
+        this.arcTo(x + w, y + h, x + w - radius, y + h, radius);
+        this.lineTo(x + radius, y + h);
+        this.arcTo(x, y + h, x, y + h - radius, radius);
+        this.lineTo(x, y + radius);
+        this.arcTo(x, y, x + radius, y, radius);
+        this.closePath();
+      };
+    }
+
     function resize() {
       if (!canvas) return;
       canvas.width = window.innerWidth;
