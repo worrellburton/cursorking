@@ -495,23 +495,25 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
 
       const speedFactor = Math.min(3, 1 + ballSpeedRef.current / 8);
 
-      // Ball trail
+      // Ball trail — grows longer and bigger with speed
       const trail = ballTrailRef.current;
       trail.push({ x: ballX, y: ballY, age: 0 });
-      while (trail.length > 20) trail.shift();
+      const maxTrail = Math.floor(10 + speedFactor * 15); // 10 at slow, up to 55 at max speed
+      while (trail.length > maxTrail) trail.shift();
 
+      const trailLife = 15 + speedFactor * 15; // trail fades slower at high speed
       for (let i = 0; i < trail.length; i++) {
         trail[i].age++;
         const tt = trail[i];
-        const life = 1 - tt.age / 25;
+        const life = 1 - tt.age / trailLife;
         if (life <= 0) continue;
 
-        const r = ballR * life * 0.8;
-        const trailGlowR = r * (2.5 + speedFactor);
+        const r = ballR * life * (0.6 + speedFactor * 0.3);
+        const trailGlowR = r * (2 + speedFactor * 1.5);
         const grad = ctx.createRadialGradient(tt.x, tt.y, 0, tt.x, tt.y, trailGlowR);
-        grad.addColorStop(0, `rgba(255, 200, 50, ${life * 0.4 * speedFactor})`);
-        grad.addColorStop(0.3, `rgba(255, 100, 20, ${life * 0.3 * speedFactor})`);
-        grad.addColorStop(0.7, `rgba(200, 30, 0, ${life * 0.1 * speedFactor})`);
+        grad.addColorStop(0, `rgba(255, 200, 50, ${life * 0.5 * speedFactor})`);
+        grad.addColorStop(0.3, `rgba(255, 100, 20, ${life * 0.4 * speedFactor})`);
+        grad.addColorStop(0.6, `rgba(200, 30, 0, ${life * 0.15 * speedFactor})`);
         grad.addColorStop(1, "rgba(100, 0, 0, 0)");
         ctx.fillStyle = grad;
         ctx.beginPath();
