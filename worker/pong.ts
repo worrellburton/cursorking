@@ -505,13 +505,23 @@ export class PongRoom extends DurableObject {
       return new Response("Expected WebSocket", { status: 426 });
     }
 
+    const url = new URL(request.url);
+    const isLobby = url.searchParams.get("mode") === "lobby";
+
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
 
     this.ctx.acceptWebSocket(server);
     this.allSockets.add(server);
 
-    const role = this.assignRole(server);
+    let role: "left" | "right" | "spectator";
+    if (isLobby) {
+      // Lobby connections are always spectators — never take a player slot
+      this.spectators.add(server);
+      role = "spectator";
+    } else {
+      role = this.assignRole(server);
+    }
     server.send(JSON.stringify({ type: "role", role }));
     server.send(
       JSON.stringify({

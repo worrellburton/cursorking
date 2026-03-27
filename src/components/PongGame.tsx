@@ -472,17 +472,17 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         ctx.fillText(String(myScore), W / 2, H * 0.9);
 
         const nameSize = Math.max(12, Math.floor(W * 0.03));
-        ctx.font = `bold ${nameSize}px 'Courier New', monospace`;
+        ctx.font = `bold ${nameSize}px 'Inter', sans-serif`;
         if (oppName) {
           ctx.fillStyle = `${oppColor}99`;
           ctx.fillText(oppName.toUpperCase(), W / 2, H * 0.04);
           if (oppLoc) {
-            ctx.font = `${Math.max(9, nameSize - 3)}px 'Courier New', monospace`;
+            ctx.font = `${Math.max(9, nameSize - 3)}px 'Inter', sans-serif`;
             ctx.fillStyle = `${oppColor}55`;
             ctx.fillText(oppLoc.toUpperCase(), W / 2, H * 0.04 + nameSize);
           }
         }
-        ctx.font = `bold ${nameSize}px 'Courier New', monospace`;
+        ctx.font = `bold ${nameSize}px 'Inter', sans-serif`;
         if (myName) {
           ctx.fillStyle = `${myColor}99`;
           ctx.fillText(myName.toUpperCase(), W / 2, H * 0.97);
@@ -495,16 +495,16 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         ctx.fillText(String(state.score.right), (W * 3) / 4, H * 0.18);
 
         const nameSize = Math.max(14, Math.floor(H * 0.025));
-        ctx.font = `bold ${nameSize}px 'Courier New', monospace`;
+        ctx.font = `bold ${nameSize}px 'Inter', sans-serif`;
         if (state.names.left) {
           ctx.fillStyle = "rgba(34, 211, 238, 0.6)";
           ctx.fillText(state.names.left.toUpperCase(), W / 4, H * 0.05);
           if (state.locations?.left) {
             const locSize = Math.max(10, Math.floor(H * 0.016));
-            ctx.font = `${locSize}px 'Courier New', monospace`;
+            ctx.font = `${locSize}px 'Inter', sans-serif`;
             ctx.fillStyle = "rgba(34, 211, 238, 0.3)";
             ctx.fillText(state.locations.left.toUpperCase(), W / 4, H * 0.05 + nameSize * 0.9);
-            ctx.font = `bold ${nameSize}px 'Courier New', monospace`;
+            ctx.font = `bold ${nameSize}px 'Inter', sans-serif`;
           }
         }
         if (state.names.right) {
@@ -512,10 +512,10 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
           ctx.fillText(state.names.right.toUpperCase(), (W * 3) / 4, H * 0.05);
           if (state.locations?.right) {
             const locSize = Math.max(10, Math.floor(H * 0.016));
-            ctx.font = `${locSize}px 'Courier New', monospace`;
+            ctx.font = `${locSize}px 'Inter', sans-serif`;
             ctx.fillStyle = "rgba(244, 63, 94, 0.3)";
             ctx.fillText(state.locations.right.toUpperCase(), (W * 3) / 4, H * 0.05 + nameSize * 0.9);
-            ctx.font = `bold ${nameSize}px 'Courier New', monospace`;
+            ctx.font = `bold ${nameSize}px 'Inter', sans-serif`;
           }
         }
       }
@@ -667,7 +667,7 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         ctx.fill();
 
         // "AMMO x3" label
-        ctx.font = `bold 13px 'Courier New', monospace`;
+        ctx.font = `bold 13px 'Inter', sans-serif`;
         ctx.textAlign = "center";
         ctx.fillStyle = "#ffdd33";
         ctx.shadowBlur = 10;
@@ -697,7 +697,7 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
             ctx.fill();
           }
 
-          ctx.font = `bold 10px 'Courier New', monospace`;
+          ctx.font = `bold 10px 'Inter', sans-serif`;
           ctx.textAlign = "center";
           ctx.fillStyle = "rgba(255,255,255,0.5)";
           ctx.shadowBlur = 0;
@@ -710,7 +710,7 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
       if (role !== "spectator" && state.slowed?.[role]) {
         ctx.save();
         const slowSize = Math.max(14, Math.floor(H * 0.022));
-        ctx.font = `bold ${slowSize}px 'Courier New', monospace`;
+        ctx.font = `bold ${slowSize}px 'Inter', sans-serif`;
         ctx.textAlign = "center";
         ctx.fillStyle = "#ff4444";
         ctx.shadowColor = "#ff4444";
@@ -784,7 +784,7 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         const myName = role === "left" ? state.names.left : role === "right" ? state.names.right : "";
         if (myName) {
           const labelSize = Math.max(11, Math.floor(H * 0.018));
-          ctx.font = `bold ${labelSize}px 'Courier New', monospace`;
+          ctx.font = `bold ${labelSize}px 'Inter', sans-serif`;
           ctx.textAlign = "left";
           const nameColor = role === "left" ? "#22d3ee" : "#f43f5e";
           ctx.fillStyle = nameColor;
@@ -808,7 +808,7 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         const dots = ".".repeat(dotCount);
         const text = `WAITING FOR PLAYER${dots}`;
 
-        ctx.font = `bold ${waitSize}px 'Courier New', monospace`;
+        ctx.font = `bold ${waitSize}px 'Inter', sans-serif`;
         ctx.textAlign = "center";
         ctx.fillStyle = "#ffffff";
         ctx.shadowColor = "rgba(255, 255, 255, 0.6)";
@@ -828,7 +828,7 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         ctx.fillRect(0, 0, W, H);
 
         const cdSize = Math.max(60, Math.floor(H * 0.2));
-        ctx.font = `bold ${cdSize}px 'Courier New', monospace`;
+        ctx.font = `bold ${cdSize}px 'Inter', sans-serif`;
         ctx.textAlign = "center";
         ctx.fillStyle = "#22d3ee";
         ctx.shadowColor = "#22d3ee";
@@ -844,7 +844,7 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         ctx.fillRect(0, 0, W, H);
 
         const winSize = Math.max(24, Math.floor(H * 0.08));
-        ctx.font = `bold ${winSize}px 'Courier New', monospace`;
+        ctx.font = `bold ${winSize}px 'Inter', sans-serif`;
         ctx.textAlign = "center";
         ctx.fillStyle = "#22d3ee";
         ctx.shadowColor = "#22d3ee";
@@ -852,7 +852,7 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         ctx.fillText(`${state.winner.toUpperCase()} WINS!`, W / 2, H / 2 - winSize * 0.3);
 
         const subSize = Math.max(14, Math.floor(H * 0.025));
-        ctx.font = `${subSize}px 'Courier New', monospace`;
+        ctx.font = `${subSize}px 'Inter', sans-serif`;
         ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
         ctx.shadowBlur = 0;
         ctx.fillText("New game starting soon...", W / 2, H / 2 + winSize * 0.8);
@@ -880,7 +880,7 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
       <div
         className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-full px-5 py-2"
         style={{
-          fontFamily: "'Courier New', monospace",
+          fontFamily: "'Inter', sans-serif",
           background: "rgba(0, 0, 0, 0.4)",
           backdropFilter: "blur(8px)",
           border: "1px solid rgba(34, 197, 94, 0.2)",

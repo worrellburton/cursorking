@@ -77,7 +77,7 @@ export default function MenuCursor({ name }: { name: string }) {
         return;
       }
       ctx.save();
-      ctx.font = "bold 11px 'Courier New', monospace";
+      ctx.font = "bold 11px 'Inter', sans-serif";
       ctx.textAlign = "left";
       const labelX = x + 16;
       const labelY = y + 18;

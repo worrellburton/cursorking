@@ -1,18 +1,27 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import SpaceBackground from "@/components/SpaceBackground";
 import PongGame from "@/components/PongGame";
 import MenuCursor from "@/components/MenuCursor";
 import HowItWorks from "@/components/HowItWorks";
+import LogoAnimation from "@/components/LogoAnimation";
+
+const WS_URL =
+  process.env.NEXT_PUBLIC_WS_URL ?? "wss://cursorking-pong.worrellburton.workers.dev";
 
 type Screen = "name" | "howItWorks" | "start" | "game";
+type LobbyCursor = { x: number; y: number; name: string };
 
 export default function Home() {
   const [playerName, setPlayerName] = useState("");
   const [screen, setScreen] = useState<Screen>("name");
   const [isMobile, setIsMobile] = useState(false);
+  const [lobbyPlayerCount, setLobbyPlayerCount] = useState(0);
+  const [lobbyCursors, setLobbyCursors] = useState<LobbyCursor[]>([]);
+  const [logoAnimDone, setLogoAnimDone] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const lobbyWsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
     const mobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(
@@ -20,6 +29,57 @@ export default function Home() {
     ) || (window.matchMedia("(pointer: coarse)").matches && window.innerWidth < 1024);
     setIsMobile(mobile);
   }, []);
+
+  // Lobby WebSocket: connect when on start or howItWorks screen
+  useEffect(() => {
+    if (screen !== "start" && screen !== "howItWorks") {
+      // Clean up lobby connection
+      if (lobbyWsRef.current) {
+        lobbyWsRef.current.close();
+        lobbyWsRef.current = null;
+      }
+      setLobbyCursors([]);
+      return;
+    }
+
+    const wsUrl = `${WS_URL}${WS_URL.includes("?") ? "&" : "?"}mode=lobby`;
+    const ws = new WebSocket(wsUrl);
+    lobbyWsRef.current = ws;
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ type: "set-name", name: playerName }));
+    };
+
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.type === "player-count") {
+        setLobbyPlayerCount(msg.count);
+      }
+      if (msg.type === "cursors") {
+        setLobbyCursors(msg.cursors);
+      }
+    };
+
+    // Send cursor position on mouse move
+    const onPointerMove = (e: PointerEvent) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(
+          JSON.stringify({
+            type: "cursor-move",
+            x: e.clientX / window.innerWidth,
+            y: e.clientY / window.innerHeight,
+          })
+        );
+      }
+    };
+    window.addEventListener("pointermove", onPointerMove);
+
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      ws.close();
+      lobbyWsRef.current = null;
+    };
+  }, [screen, playerName]);
 
   const handleNameSubmit = () => {
     if (!playerName.trim()) return;
@@ -35,12 +95,12 @@ export default function Home() {
     cursorKingAudio.volume = 0.6;
     cursorKingAudio.play().catch(() => {});
 
+    setLogoAnimDone(false);
     setScreen("start");
   };
 
   const handleStart = () => {
     const base = process.env.NODE_ENV === "production" ? "/cursorking" : "";
-    // Create fresh audio on this user gesture to satisfy autoplay policy
     if (!audioRef.current) {
       const audio = new Audio(`${base}/music.mp3`);
       audio.volume = 0.5;
@@ -48,20 +108,12 @@ export default function Home() {
       audioRef.current = audio;
     }
     audioRef.current.play().catch(() => {});
-
     setScreen("game");
   };
 
-  const titleEl = (
-    <h1
-      className={`title-fire font-bold tracking-widest ${isMobile ? "text-5xl" : "text-7xl sm:text-9xl"}`}
-      style={{
-        fontFamily: "Inter, sans-serif",
-      }}
-    >
-      CURSOR<span className="title-fire-king">KING</span>
-    </h1>
-  );
+  const handleLogoComplete = useCallback(() => {
+    setLogoAnimDone(true);
+  }, []);
 
   const pillButton = (label: string, enabled: boolean, onClick: () => void) => (
     <button
@@ -109,6 +161,47 @@ export default function Home() {
     <main className={`relative flex min-h-screen flex-col items-center justify-center overflow-hidden ${!isMobile && screen !== "name" ? "cursor-none" : ""}`}>
       <SpaceBackground />
       {!isMobile && (screen === "start" || screen === "howItWorks") && <MenuCursor name={playerName} />}
+
+      {/* Lobby cursors from other players */}
+      {(screen === "start" || screen === "howItWorks") && lobbyCursors.map((c, i) => (
+        <div
+          key={i}
+          className="pointer-events-none fixed z-30"
+          style={{
+            left: c.x * 100 + "%",
+            top: c.y * 100 + "%",
+            transform: "translate(-2px, -2px)",
+            transition: "left 0.1s linear, top 0.1s linear",
+          }}
+        >
+          {/* Cursor arrow */}
+          <svg width="16" height="22" viewBox="0 0 16 22" style={{ filter: "drop-shadow(0 0 6px rgba(255, 160, 50, 0.6))" }}>
+            <path d="M0,0 L0,18 L5,14 L8,20 L11,19 L8,13 L13,12 Z" fill="rgba(255, 160, 50, 0.7)" stroke="rgba(0,0,0,0.3)" strokeWidth="0.5" />
+          </svg>
+          {/* Name label */}
+          {c.name && (
+            <div
+              style={{
+                position: "absolute",
+                left: 16,
+                top: 14,
+                fontFamily: "Inter, sans-serif",
+                fontSize: "10px",
+                fontWeight: "bold",
+                color: "rgba(255, 180, 80, 0.9)",
+                background: "rgba(0, 0, 0, 0.5)",
+                borderRadius: "6px",
+                padding: "2px 6px",
+                whiteSpace: "nowrap",
+                letterSpacing: "0.1em",
+                textShadow: "0 0 6px rgba(255, 160, 50, 0.5)",
+              }}
+            >
+              {c.name.toUpperCase()}
+            </div>
+          )}
+        </div>
+      ))}
 
       {/* Mobile badge */}
       {isMobile && screen !== "game" && (
@@ -167,7 +260,6 @@ export default function Home() {
               }}
             />
           </div>
-          {/* Submit button for mobile (no Enter key) */}
           {isMobile && playerName.trim() && (
             <button
               onClick={handleNameSubmit}
@@ -197,10 +289,47 @@ export default function Home() {
       {screen === "start" && (
         <>
           <div className="relative z-10 flex flex-col items-center gap-6 text-center px-4">
-            {titleEl}
+            {/* Animated logo: cursor flies in, clicks, explodes, title appears */}
+            <LogoAnimation isMobile={isMobile} onComplete={handleLogoComplete} />
 
-            <div className="flex flex-col items-center gap-4" style={{ marginTop: 16 }}>
+            {/* Buttons fade in after logo animation */}
+            <div
+              className="flex flex-col items-center"
+              style={{
+                marginTop: 24,
+                opacity: logoAnimDone ? 1 : 0,
+                transform: logoAnimDone ? "translateY(0)" : "translateY(20px)",
+                transition: "opacity 0.6s ease-out 0.2s, transform 0.6s ease-out 0.2s",
+              }}
+            >
               {pillButton("ENTER THE ARENA", true, handleStart)}
+
+              {/* Player count */}
+              <div
+                style={{
+                  fontFamily: "Inter, sans-serif",
+                  fontSize: "0.7rem",
+                  fontWeight: "bold",
+                  color: "rgba(255, 255, 255, 0.35)",
+                  letterSpacing: "0.2em",
+                  marginTop: 14,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+              >
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background: lobbyPlayerCount > 0 ? "#22d3ee" : "rgba(255,255,255,0.2)",
+                    boxShadow: lobbyPlayerCount > 0 ? "0 0 8px rgba(34, 211, 238, 0.6)" : "none",
+                    display: "inline-block",
+                  }}
+                />
+                {lobbyPlayerCount > 0 ? `${lobbyPlayerCount} ONLINE` : "CONNECTING..."}
+              </div>
 
               <button
                 onClick={() => setScreen("howItWorks")}
@@ -220,6 +349,7 @@ export default function Home() {
                   letterSpacing: "0.15em",
                   animation: "cyan-glow 2s ease-in-out infinite",
                   transition: "all 0.3s",
+                  marginTop: 28,
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = "rgba(34, 211, 238, 0.15)";
