@@ -128,21 +128,14 @@ export default function WarLobby({
   }, [playerName, onGameStart]);
 
   const selectSlot = (team: Team, role: Role) => {
-    if (locked) return; // already locked into a role
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-    wsRef.current.send(JSON.stringify({ type: "select-slot", team, role }));
+    if (locked) return;
+    // Optimistic UI update — lock in immediately
     setSelectedRole({ team, role });
     setLocked(true);
-  };
-
-  const selectRole = (role: Role) => {
-    if (locked) return;
-    // Find open slots for this role across both teams
-    const openSlots = slots.filter(s => s.role === role && !s.taken);
-    if (openSlots.length === 0) return;
-    // Pick a random open team
-    const pick = openSlots[Math.floor(Math.random() * openSlots.length)];
-    selectSlot(pick.team, pick.role);
+    // Send to server if connected
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: "select-slot", team, role }));
+    }
   };
 
   const renderSlot = (slot: SlotInfo) => {
@@ -416,83 +409,6 @@ export default function WarLobby({
         </div>
       )}
 
-      {/* Role cards overview */}
-      <div style={{
-        marginTop: 24,
-        display: "flex",
-        gap: 10,
-        flexWrap: "wrap",
-        justifyContent: "center",
-        maxWidth: 700,
-        padding: "0 16px 32px",
-      }}>
-        {ROLES.map(role => {
-          const info = ROLE_INFO[role];
-          const isSelected = selectedRole?.role === role;
-          const hasOpen = slots.some(s => s.role === role && !s.taken);
-          const canPick = !locked && hasOpen;
-          return (
-            <button
-              key={role}
-              onClick={() => canPick && selectRole(role)}
-              disabled={!canPick}
-              style={{
-                width: 120,
-                padding: "10px 8px",
-                background: isSelected ? `${info.color}15` : canPick ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)",
-                border: `1px solid ${isSelected ? info.color + "55" : canPick ? info.color + "33" : "rgba(255,255,255,0.06)"}`,
-                borderRadius: 10,
-                textAlign: "center" as const,
-                transition: "all 0.2s",
-                cursor: canPick ? "pointer" : "default",
-                opacity: locked && !isSelected ? 0.4 : 1,
-              }}
-            >
-              <div style={{ fontSize: 20 }}>{info.icon}</div>
-              <div style={{
-                fontFamily: "Inter, sans-serif",
-                fontSize: 10,
-                fontWeight: "bold",
-                color: info.color,
-                letterSpacing: "0.1em",
-                marginTop: 4,
-              }}>
-                {info.label}
-              </div>
-              <div style={{
-                fontFamily: "Inter, sans-serif",
-                fontSize: 8,
-                color: "rgba(255,255,255,0.35)",
-                marginTop: 4,
-                lineHeight: 1.4,
-              }}>
-                {info.hp} HP
-              </div>
-              <div style={{
-                fontFamily: "Inter, sans-serif",
-                fontSize: 8,
-                color: "rgba(255,255,255,0.25)",
-                marginTop: 2,
-                lineHeight: 1.4,
-              }}>
-                {info.desc}
-              </div>
-              {canPick && (
-                <div style={{
-                  fontFamily: "Inter, sans-serif",
-                  fontSize: 8,
-                  color: info.color,
-                  marginTop: 4,
-                  letterSpacing: "0.1em",
-                  opacity: 0.7,
-                }}>
-                  CLICK TO LOCK IN
-                </div>
-              )}
-            </button>
-          );
-        })}
-      </div>
     </div>
   );
 }
