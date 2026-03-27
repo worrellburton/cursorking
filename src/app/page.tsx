@@ -31,9 +31,9 @@ export default function Home() {
   }, []);
 
   // Lobby WebSocket: connect when on start or howItWorks screen
+  // NOTE: Requires worker deploy with ?mode=lobby support to avoid stealing player slots
   useEffect(() => {
     if (screen !== "start" && screen !== "howItWorks") {
-      // Clean up lobby connection
       if (lobbyWsRef.current) {
         lobbyWsRef.current.close();
         lobbyWsRef.current = null;
@@ -42,9 +42,11 @@ export default function Home() {
       return;
     }
 
+    // Connect in lobby mode so we never take a player slot
     const wsUrl = `${WS_URL}${WS_URL.includes("?") ? "&" : "?"}mode=lobby`;
     const ws = new WebSocket(wsUrl);
     lobbyWsRef.current = ws;
+    let isLobby = true;
 
     ws.onopen = () => {
       ws.send(JSON.stringify({ type: "set-name", name: playerName }));
@@ -52,6 +54,14 @@ export default function Home() {
 
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
+      // If server assigned us a player role, it doesn't support lobby mode yet
+      // Close immediately to avoid stealing a slot
+      if (msg.type === "role" && (msg.role === "left" || msg.role === "right")) {
+        isLobby = false;
+        ws.close();
+        lobbyWsRef.current = null;
+        return;
+      }
       if (msg.type === "player-count") {
         setLobbyPlayerCount(msg.count);
       }
@@ -60,9 +70,8 @@ export default function Home() {
       }
     };
 
-    // Send cursor position on mouse move
     const onPointerMove = (e: PointerEvent) => {
-      if (ws.readyState === WebSocket.OPEN) {
+      if (isLobby && ws.readyState === WebSocket.OPEN) {
         ws.send(
           JSON.stringify({
             type: "cursor-move",
@@ -108,6 +117,13 @@ export default function Home() {
       audioRef.current = audio;
     }
     audioRef.current.play().catch(() => {});
+
+    // Close lobby WS early so the server frees any player slot before the game WS connects
+    if (lobbyWsRef.current) {
+      lobbyWsRef.current.close();
+      lobbyWsRef.current = null;
+    }
+
     setScreen("game");
   };
 
