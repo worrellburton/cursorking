@@ -83,8 +83,44 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
 
   const locationRef = useRef("");
 
+  // Sound effects refs
+  const sfxRef = useRef<Record<string, HTMLAudioElement>>({});
+  const sfxLoadedRef = useRef(false);
+
   // Only playerCount triggers React re-render (for the HUD text)
   const [playerCount, setPlayerCount] = useState(0);
+
+  // Preload sound effects
+  useEffect(() => {
+    const base = process.env.NODE_ENV === "production" ? "/cursorking" : "";
+    const sounds: Record<string, string> = {
+      countdown3: `${base}/3.mp3`,
+      countdown2: `${base}/2.mp3`,
+      countdown1: `${base}/1.mp3`,
+      go: `${base}/GO!.mp3`,
+      roundStart: `${base}/ROUND START.mp3`,
+      nextRound: `${base}/Next Round.mp3`,
+      youWin: `${base}/YOU WIN.mp3`,
+      youLost: `${base}/You Lost.mp3`,
+    };
+    const loaded: Record<string, HTMLAudioElement> = {};
+    for (const [key, src] of Object.entries(sounds)) {
+      const a = new Audio(src);
+      a.volume = 0.7;
+      a.load();
+      loaded[key] = a;
+    }
+    sfxRef.current = loaded;
+    sfxLoadedRef.current = true;
+  }, []);
+
+  const playSfx = useCallback((name: string) => {
+    const audio = sfxRef.current[name];
+    if (audio) {
+      audio.currentTime = 0;
+      audio.play().catch(() => {});
+    }
+  }, []);
 
   // Fetch player location
   useEffect(() => {
@@ -111,6 +147,18 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         const msg = JSON.parse(event.data);
         if (msg.type === "game-state") {
           const state = msg.state as GameState;
+
+          // Check for winner transition BEFORE updating state
+          if (state.winner && !gameStateRef.current.winner) {
+            const role = myRoleRef.current;
+            const myName = role === "left" ? state.names.left : role === "right" ? state.names.right : "";
+            if (state.winner === myName) {
+              playSfx("youWin");
+            } else if (role === "left" || role === "right") {
+              playSfx("youLost");
+            }
+            setTimeout(() => playSfx("nextRound"), 2000);
+          }
 
           // Ball interpolation
           const now = performance.now();
@@ -140,6 +188,13 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         }
         if (msg.type === "countdown") {
           countdownRef.current = msg.value > 0 ? msg.value : null;
+          if (msg.value === 3) playSfx("countdown3");
+          else if (msg.value === 2) playSfx("countdown2");
+          else if (msg.value === 1) playSfx("countdown1");
+          else if (msg.value === 0) playSfx("go");
+        }
+        if (msg.type === "point-scored") {
+          playSfx("roundStart");
         }
         if (msg.type === "bullet-hit") {
           const role = myRoleRef.current;

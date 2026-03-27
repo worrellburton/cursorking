@@ -32,14 +32,21 @@ export default function Home() {
   };
 
   const handleStart = () => {
+    const base = process.env.NODE_ENV === "production" ? "/cursorking" : "";
     // Create fresh audio on this user gesture to satisfy autoplay policy
     if (!audioRef.current) {
-      const audio = new Audio(`${process.env.NODE_ENV === "production" ? "/cursorking" : ""}/music.mp3`);
+      const audio = new Audio(`${base}/music.mp3`);
       audio.volume = 0.5;
       audio.loop = true;
       audioRef.current = audio;
     }
     audioRef.current.play().catch(() => {});
+
+    // Layer CURSOR KING.mp3 on top of background music
+    const cursorKingAudio = new Audio(`${base}/CURSOR KING.mp3`);
+    cursorKingAudio.volume = 0.6;
+    cursorKingAudio.play().catch(() => {});
+
     setScreen("game");
   };
 

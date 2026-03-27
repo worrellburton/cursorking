@@ -401,6 +401,7 @@ export class PongRoom extends DurableObject {
         return;
       }
       this.resetBall("right");
+      this.broadcast(JSON.stringify({ type: "point-scored", scorer: "right" }));
     }
     if (ball.x > 1) {
       this.state_.score.left++;
@@ -411,6 +412,7 @@ export class PongRoom extends DurableObject {
         return;
       }
       this.resetBall("left");
+      this.broadcast(JSON.stringify({ type: "point-scored", scorer: "left" }));
     }
 
     this.broadcastState();
