@@ -172,23 +172,60 @@ export class PongRoom extends DurableObject {
       ball.vy = -Math.abs(ball.vy);
     }
 
-    // Left paddle collision (can hit from either side)
+    // Swept collision helper: check if ball crossed paddle during this tick
+    const prevBallX = ball.x - ball.vx;
+    const prevBallY = ball.y - ball.vy;
+
+    // Left paddle collision
     const lp = paddles.left;
     const lpLeft = lp.x - PADDLE_WIDTH / 2;
     const lpRight = lp.x + PADDLE_WIDTH / 2;
     const lpTop = lp.y - PADDLE_HEIGHT / 2;
     const lpBottom = lp.y + PADDLE_HEIGHT / 2;
 
-    if (
-      ball.x - BALL_SIZE <= lpRight &&
-      ball.x + BALL_SIZE >= lpLeft &&
-      ball.y >= lpTop &&
-      ball.y <= lpBottom
+    // Check if ball crossed the paddle's x-range during this tick
+    const ballEdgeR = ball.x + BALL_SIZE;
+    const ballEdgeL = ball.x - BALL_SIZE;
+    const prevEdgeR = prevBallX + BALL_SIZE;
+    const prevEdgeL = prevBallX - BALL_SIZE;
+
+    // Ball moving left, crossed into paddle from right side
+    if (ball.vx < 0 && prevEdgeL >= lpRight && ballEdgeL <= lpRight) {
+      // Interpolate Y at crossing point
+      const t = (lpRight - (prevBallX - BALL_SIZE)) / (ball.vx);
+      const crossY = prevBallY + ball.vy * t;
+      if (crossY >= lpTop && crossY <= lpBottom) {
+        const hitPos = (crossY - lp.y) / (PADDLE_HEIGHT / 2);
+        const angle = hitPos * (Math.PI / 4);
+        const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * BALL_ACCEL;
+        ball.x = lpRight + BALL_SIZE;
+        ball.y = crossY;
+        ball.vx = Math.abs(speed * Math.cos(angle));
+        ball.vy = speed * Math.sin(angle);
+      }
+    }
+    // Ball moving right, crossed into paddle from left side
+    else if (ball.vx > 0 && prevEdgeR <= lpLeft && ballEdgeR >= lpLeft) {
+      const t = (lpLeft - (prevBallX + BALL_SIZE)) / (ball.vx);
+      const crossY = prevBallY + ball.vy * t;
+      if (crossY >= lpTop && crossY <= lpBottom) {
+        const hitPos = (crossY - lp.y) / (PADDLE_HEIGHT / 2);
+        const angle = hitPos * (Math.PI / 4);
+        const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * BALL_ACCEL;
+        ball.x = lpLeft - BALL_SIZE;
+        ball.y = crossY;
+        ball.vx = -Math.abs(speed * Math.cos(angle));
+        ball.vy = speed * Math.sin(angle);
+      }
+    }
+    // Ball currently overlapping paddle (fallback for slow speeds)
+    else if (
+      ballEdgeR >= lpLeft && ballEdgeL <= lpRight &&
+      ball.y >= lpTop && ball.y <= lpBottom
     ) {
       const hitPos = (ball.y - lp.y) / (PADDLE_HEIGHT / 2);
       const angle = hitPos * (Math.PI / 4);
       const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * BALL_ACCEL;
-      // Reflect based on which side of paddle ball is on
       if (ball.x < lp.x) {
         ball.x = lpLeft - BALL_SIZE;
         ball.vx = -Math.abs(speed * Math.cos(angle));
@@ -199,18 +236,45 @@ export class PongRoom extends DurableObject {
       ball.vy = speed * Math.sin(angle);
     }
 
-    // Right paddle collision (can hit from either side)
+    // Right paddle collision
     const rp = paddles.right;
     const rpLeft = rp.x - PADDLE_WIDTH / 2;
     const rpRight = rp.x + PADDLE_WIDTH / 2;
     const rpTop = rp.y - PADDLE_HEIGHT / 2;
     const rpBottom = rp.y + PADDLE_HEIGHT / 2;
 
-    if (
-      ball.x + BALL_SIZE >= rpLeft &&
-      ball.x - BALL_SIZE <= rpRight &&
-      ball.y >= rpTop &&
-      ball.y <= rpBottom
+    // Ball moving right, crossed into paddle from left side
+    if (ball.vx > 0 && prevEdgeR <= rpLeft && ball.x + BALL_SIZE >= rpLeft) {
+      const t = (rpLeft - (prevBallX + BALL_SIZE)) / (ball.vx);
+      const crossY = prevBallY + ball.vy * t;
+      if (crossY >= rpTop && crossY <= rpBottom) {
+        const hitPos = (crossY - rp.y) / (PADDLE_HEIGHT / 2);
+        const angle = hitPos * (Math.PI / 4);
+        const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * BALL_ACCEL;
+        ball.x = rpLeft - BALL_SIZE;
+        ball.y = crossY;
+        ball.vx = -Math.abs(speed * Math.cos(angle));
+        ball.vy = speed * Math.sin(angle);
+      }
+    }
+    // Ball moving left, crossed into paddle from right side
+    else if (ball.vx < 0 && prevEdgeL >= rpRight && ball.x - BALL_SIZE <= rpRight) {
+      const t = (rpRight - (prevBallX - BALL_SIZE)) / (ball.vx);
+      const crossY = prevBallY + ball.vy * t;
+      if (crossY >= rpTop && crossY <= rpBottom) {
+        const hitPos = (crossY - rp.y) / (PADDLE_HEIGHT / 2);
+        const angle = hitPos * (Math.PI / 4);
+        const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * BALL_ACCEL;
+        ball.x = rpRight + BALL_SIZE;
+        ball.y = crossY;
+        ball.vx = Math.abs(speed * Math.cos(angle));
+        ball.vy = speed * Math.sin(angle);
+      }
+    }
+    // Ball currently overlapping paddle (fallback)
+    else if (
+      ball.x + BALL_SIZE >= rpLeft && ball.x - BALL_SIZE <= rpRight &&
+      ball.y >= rpTop && ball.y <= rpBottom
     ) {
       const hitPos = (ball.y - rp.y) / (PADDLE_HEIGHT / 2);
       const angle = hitPos * (Math.PI / 4);
