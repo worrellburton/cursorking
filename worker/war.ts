@@ -132,6 +132,8 @@ interface Slot {
 export class WarRoom extends DurableObject {
   sockets = new Map<string, WebSocket>();
   names = new Map<string, string>();
+  lobbyCursors = new Map<string, { x: number; y: number }>();
+  lobbyCursorInterval: ReturnType<typeof setInterval> | null = null;
   phase: Phase = "lobby";
   players = new Map<string, Player>();
   bullets: Bullet[] = [];
@@ -158,6 +160,30 @@ export class WarRoom extends DurableObject {
 
   genId(): string {
     return "p" + Math.random().toString(36).slice(2, 8);
+  }
+
+  // ---- Lobby cursors ----
+
+  startLobbyCursors() {
+    if (this.lobbyCursorInterval) return;
+    this.lobbyCursorInterval = setInterval(() => this.broadcastLobbyCursors(), 80);
+  }
+
+  stopLobbyCursors() {
+    if (this.lobbyCursorInterval) {
+      clearInterval(this.lobbyCursorInterval);
+      this.lobbyCursorInterval = null;
+    }
+    this.lobbyCursors.clear();
+  }
+
+  broadcastLobbyCursors() {
+    if (this.phase !== "lobby" && this.phase !== "countdown") return;
+    const cursors: { x: number; y: number; name: string; id: string }[] = [];
+    for (const [id, pos] of this.lobbyCursors) {
+      cursors.push({ x: pos.x, y: pos.y, name: this.names.get(id) ?? "", id });
+    }
+    this.broadcast(JSON.stringify({ type: "war-cursors", cursors }));
   }
 
   // ---- Lobby ----
@@ -220,6 +246,7 @@ export class WarRoom extends DurableObject {
 
   startGame() {
     this.phase = "playing";
+    this.stopLobbyCursors();
     this.bullets = [];
     this.winner = null;
     this.players.clear();
@@ -272,6 +299,9 @@ export class WarRoom extends DurableObject {
     this.winner = null;
     this.initSlots();
     this.broadcastLobby();
+    if (this.sockets.size > 0) {
+      this.startLobbyCursors();
+    }
   }
 
   // ---- Tick ----
@@ -645,6 +675,7 @@ export class WarRoom extends DurableObject {
     server.send(JSON.stringify({ type: "war-welcome", id, phase: this.phase }));
 
     if (this.phase === "lobby" || this.phase === "countdown") {
+      this.startLobbyCursors();
       // Send lobby state to the new connection
       server.send(JSON.stringify({
         type: "war-lobby",
@@ -695,6 +726,14 @@ export class WarRoom extends DurableObject {
     }
 
     if (data.type === "cursor-move") {
+      // Lobby cursor tracking
+      if (this.phase === "lobby" || this.phase === "countdown") {
+        this.lobbyCursors.set(senderId, {
+          x: Math.max(0, Math.min(1, data.x)),
+          y: Math.max(0, Math.min(1, data.y)),
+        });
+      }
+      // Game player movement
       const player = this.players.get(senderId);
       if (player && player.alive) {
         player.targetX = Math.max(0, Math.min(1, data.x));
@@ -731,6 +770,9 @@ export class WarRoom extends DurableObject {
       }
     }
     if (!disconnectedId) return;
+
+    // Remove lobby cursor
+    this.lobbyCursors.delete(disconnectedId);
 
     // Remove from lobby slots
     for (const s of this.slots) {

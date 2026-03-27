@@ -17,12 +17,7 @@ type SlotInfo = {
   playerId: string | null;
 };
 
-type LobbyState = {
-  phase: string;
-  slots: SlotInfo[];
-  playerCount: number;
-  countdown: number | null;
-};
+type LobbyCursor = { x: number; y: number; name: string; id: string };
 
 const ROLE_INFO: Record<Role, { label: string; icon: string; color: string; desc: string; hp: number; ability: string }> = {
   king:   { label: "KING",   icon: "👑", color: "#ffd700", hp: 100, desc: "If your King dies, you lose.", ability: "Slow shot (5s cooldown), 10x damage to Orb. Empowered = instant recharge." },
@@ -31,6 +26,17 @@ const ROLE_INFO: Record<Role, { label: string; icon: string; color: string; desc
   healer: { label: "HEALER", icon: "💚", color: "#44ff88", hp: 100, desc: "Support role that keeps the team alive.", ability: "Left click = heal nearest ally. Right click = empower nearest ally." },
   gunner: { label: "GUNNER", icon: "🔫", color: "#ff8800", hp: 100, desc: "Fast and aggressive.", ability: "Rapid-fire machine gun. Fastest movement. Empowered = double fire rate." },
 };
+
+// Generate default empty slots
+function defaultSlots(): SlotInfo[] {
+  const slots: SlotInfo[] = [];
+  for (const team of ["top", "bottom"] as Team[]) {
+    for (const role of ROLES) {
+      slots.push({ team, role, taken: false, playerName: "", playerId: null });
+    }
+  }
+  return slots;
+}
 
 export default function WarLobby({
   playerName,
@@ -43,9 +49,12 @@ export default function WarLobby({
 }) {
   const wsRef = useRef<WebSocket | null>(null);
   const myIdRef = useRef("");
-  const [lobby, setLobby] = useState<LobbyState | null>(null);
+  const [slots, setSlots] = useState<SlotInfo[]>(defaultSlots());
+  const [playerCount, setPlayerCount] = useState(0);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [selectedRole, setSelectedRole] = useState<{ team: Team; role: Role } | null>(null);
+  const [locked, setLocked] = useState(false); // once you pick, you're locked in
+  const [cursors, setCursors] = useState<LobbyCursor[]>([]);
   const handedOffRef = useRef(false);
 
   useEffect(() => {
@@ -66,15 +75,15 @@ export default function WarLobby({
       }
 
       if (msg.type === "war-lobby") {
-        setLobby(msg);
+        setSlots(msg.slots);
+        setPlayerCount(msg.playerCount);
         setCountdown(msg.countdown);
-        // Sync selected role from server state
+        // Sync selected role from server
         if (myIdRef.current) {
           const mySlot = msg.slots.find((s: SlotInfo) => s.playerId === myIdRef.current);
           if (mySlot) {
             setSelectedRole({ team: mySlot.team, role: mySlot.role });
-          } else {
-            setSelectedRole(null);
+            setLocked(true);
           }
         }
       }
@@ -83,9 +92,13 @@ export default function WarLobby({
         setCountdown(msg.value);
       }
 
+      if (msg.type === "war-cursors") {
+        setCursors(msg.cursors);
+      }
+
       if (msg.type === "war-start") {
         handedOffRef.current = true;
-        wsRef.current = null; // prevent cleanup from closing
+        wsRef.current = null;
         onGameStart(ws, myIdRef.current);
       }
     };
@@ -94,7 +107,20 @@ export default function WarLobby({
       wsRef.current = null;
     };
 
+    // Send cursor position
+    const onPointerMove = (e: PointerEvent) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: "cursor-move",
+          x: e.clientX / window.innerWidth,
+          y: e.clientY / window.innerHeight,
+        }));
+      }
+    };
+    window.addEventListener("pointermove", onPointerMove);
+
     return () => {
+      window.removeEventListener("pointermove", onPointerMove);
       if (!handedOffRef.current && wsRef.current === ws) {
         ws.close();
       }
@@ -102,20 +128,24 @@ export default function WarLobby({
   }, [playerName, onGameStart]);
 
   const selectSlot = (team: Team, role: Role) => {
+    if (locked) return; // already locked into a role
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
     wsRef.current.send(JSON.stringify({ type: "select-slot", team, role }));
+    setSelectedRole({ team, role });
+    setLocked(true);
   };
 
   const renderSlot = (slot: SlotInfo) => {
     const info = ROLE_INFO[slot.role];
     const isMe = slot.playerId === myIdRef.current;
     const taken = slot.taken;
+    const canClick = !taken && !locked;
 
     return (
       <button
         key={`${slot.team}-${slot.role}`}
-        onClick={() => selectSlot(slot.team, slot.role)}
-        disabled={taken && !isMe}
+        onClick={() => canClick && selectSlot(slot.team, slot.role)}
+        disabled={!canClick}
         style={{
           display: "flex",
           flexDirection: "column",
@@ -127,12 +157,14 @@ export default function WarLobby({
             ? "rgba(34, 211, 238, 0.15)"
             : taken
               ? "rgba(255, 255, 255, 0.05)"
-              : "rgba(255, 255, 255, 0.08)",
-          border: `2px solid ${isMe ? "#22d3ee" : taken ? "rgba(255,255,255,0.1)" : info.color + "66"}`,
+              : locked
+                ? "rgba(255, 255, 255, 0.03)"
+                : "rgba(255, 255, 255, 0.08)",
+          border: `2px solid ${isMe ? "#22d3ee" : taken ? "rgba(255,255,255,0.15)" : locked ? "rgba(255,255,255,0.05)" : info.color + "55"}`,
           borderRadius: 12,
-          cursor: taken && !isMe ? "default" : "pointer",
+          cursor: canClick ? "pointer" : "default",
           transition: "all 0.2s",
-          opacity: taken && !isMe ? 0.5 : 1,
+          opacity: (taken && !isMe) || (locked && !isMe) ? 0.45 : 1,
         }}
       >
         <span style={{ fontSize: 28 }}>{info.icon}</span>
@@ -151,19 +183,19 @@ export default function WarLobby({
           style={{
             fontFamily: "Inter, sans-serif",
             fontSize: 9,
-            color: taken ? "#22d3ee" : "rgba(255,255,255,0.3)",
+            color: isMe ? "#22d3ee" : taken ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.25)",
             fontWeight: taken ? "bold" : "normal",
             minHeight: 14,
           }}
         >
-          {taken ? (isMe ? "YOU" : slot.playerName.toUpperCase()) : "OPEN"}
+          {isMe ? "YOU ✓" : taken ? slot.playerName.toUpperCase() : "OPEN"}
         </span>
       </button>
     );
   };
 
   const renderTeam = (team: Team) => {
-    const teamSlots = lobby?.slots.filter(s => s.team === team) ?? [];
+    const teamSlots = slots.filter(s => s.team === team);
     const teamColor = team === "top" ? "#22d3ee" : "#ff8040";
     const teamLabel = team === "top" ? "TOP TEAM" : "BOTTOM TEAM";
 
@@ -188,13 +220,62 @@ export default function WarLobby({
     );
   };
 
-  const filledCount = lobby?.slots.filter(s => s.taken).length ?? 0;
+  const filledCount = slots.filter(s => s.taken).length;
 
   return (
     <div
       className="fixed inset-0 z-20 flex flex-col items-center justify-center"
-      style={{ background: "rgba(0, 0, 0, 0.9)", backdropFilter: "blur(8px)", overflowY: "auto" }}
+      style={{ background: "rgba(0, 0, 0, 0.9)", backdropFilter: "blur(8px)", overflowY: "auto", cursor: "none" }}
     >
+      {/* Lobby cursors */}
+      {cursors.map((c, i) => (
+        <div
+          key={i}
+          className="pointer-events-none fixed z-50"
+          style={{
+            left: c.x * 100 + "%",
+            top: c.y * 100 + "%",
+            transform: "translate(-2px, -2px)",
+            transition: "left 0.08s linear, top 0.08s linear",
+          }}
+        >
+          <svg width="16" height="22" viewBox="0 0 16 22" style={{ filter: "drop-shadow(0 0 6px rgba(255, 160, 50, 0.6))" }}>
+            <path d="M0,0 L0,18 L5,14 L8,20 L11,19 L8,13 L13,12 Z" fill="rgba(255, 160, 50, 0.8)" stroke="rgba(0,0,0,0.3)" strokeWidth="0.5" />
+          </svg>
+          {c.name && (
+            <div
+              style={{
+                position: "absolute",
+                left: 16,
+                top: 14,
+                fontFamily: "Inter, sans-serif",
+                fontSize: "9px",
+                fontWeight: "bold",
+                color: "rgba(255, 180, 80, 0.9)",
+                background: "rgba(0, 0, 0, 0.6)",
+                borderRadius: "5px",
+                padding: "2px 6px",
+                whiteSpace: "nowrap",
+                letterSpacing: "0.08em",
+              }}
+            >
+              {c.name.toUpperCase()}
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* My cursor */}
+      <style>{`
+        .war-lobby-cursor {
+          position: fixed;
+          pointer-events: none;
+          z-index: 60;
+          transform: translate(-2px, -2px);
+        }
+      `}</style>
+      <div className="war-lobby-cursor" id="my-war-cursor" />
+
       {/* Back button */}
       <button
         onClick={onBack}
@@ -210,7 +291,7 @@ export default function WarLobby({
           border: "1px solid rgba(255,255,255,0.2)",
           borderRadius: 8,
           padding: "6px 16px",
-          cursor: "pointer",
+          cursor: "none",
           zIndex: 30,
         }}
       >
@@ -284,7 +365,7 @@ export default function WarLobby({
         )}
       </div>
 
-      {/* Role card for selected slot */}
+      {/* Selected role card */}
       {selectedRole && (
         <div
           style={{
@@ -305,7 +386,7 @@ export default function WarLobby({
             letterSpacing: "0.1em",
             marginBottom: 6,
           }}>
-            {ROLE_INFO[selectedRole.role].icon} {ROLE_INFO[selectedRole.role].label} — {ROLE_INFO[selectedRole.role].hp} HP
+            {ROLE_INFO[selectedRole.role].icon} {ROLE_INFO[selectedRole.role].label} — {ROLE_INFO[selectedRole.role].hp} HP — {selectedRole.team.toUpperCase()} TEAM
           </div>
           <div style={{
             fontFamily: "Inter, sans-serif",
@@ -324,6 +405,15 @@ export default function WarLobby({
           }}>
             {ROLE_INFO[selectedRole.role].ability}
           </div>
+          <div style={{
+            fontFamily: "Inter, sans-serif",
+            fontSize: 9,
+            color: "#22d3ee",
+            marginTop: 8,
+            letterSpacing: "0.1em",
+          }}>
+            ✓ LOCKED IN — WAITING FOR PLAYERS
+          </div>
         </div>
       )}
 
@@ -335,7 +425,7 @@ export default function WarLobby({
         flexWrap: "wrap",
         justifyContent: "center",
         maxWidth: 700,
-        padding: "0 16px",
+        padding: "0 16px 32px",
       }}>
         {ROLES.map(role => {
           const info = ROLE_INFO[role];
