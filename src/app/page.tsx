@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import SpaceBackground from "@/components/SpaceBackground";
 import PongGame from "@/components/PongGame";
 import MenuCursor from "@/components/MenuCursor";
+import HowItWorks from "@/components/HowItWorks";
 
-type Screen = "name" | "start" | "game";
+type Screen = "name" | "howItWorks" | "start" | "game";
 
 export default function Home() {
   const [playerName, setPlayerName] = useState("");
@@ -27,7 +28,7 @@ export default function Home() {
     audio.loop = true;
     audio.load();
     audioRef.current = audio;
-    setScreen("start");
+    setScreen("howItWorks");
   };
 
   const handleStart = () => {
@@ -98,7 +99,7 @@ export default function Home() {
   return (
     <main className={`relative flex min-h-screen flex-col items-center justify-center overflow-hidden ${!isMobile && screen !== "name" ? "cursor-none" : ""}`}>
       <SpaceBackground />
-      {!isMobile && screen === "start" && <MenuCursor name={playerName} />}
+      {!isMobile && (screen === "start" || screen === "howItWorks") && <MenuCursor name={playerName} />}
 
       {/* Mobile badge */}
       {isMobile && screen !== "game" && (
@@ -178,6 +179,10 @@ export default function Home() {
             </button>
           )}
         </div>
+      )}
+
+      {screen === "howItWorks" && (
+        <HowItWorks isMobile={isMobile} onContinue={() => setScreen("start")} />
       )}
 
       {screen === "start" && (
