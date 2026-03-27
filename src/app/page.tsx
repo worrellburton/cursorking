@@ -6,11 +6,13 @@ import PongGame from "@/components/PongGame";
 import MenuCursor from "@/components/MenuCursor";
 import HowItWorks from "@/components/HowItWorks";
 import LogoAnimation from "@/components/LogoAnimation";
+import WarLobby from "@/components/WarLobby";
+import WarGame from "@/components/WarGame";
 
 const WS_URL =
   process.env.NEXT_PUBLIC_WS_URL ?? "wss://cursorking-pong.worrellburton.workers.dev";
 
-type Screen = "name" | "howItWorks" | "start" | "game";
+type Screen = "name" | "howItWorks" | "start" | "game" | "warLobby" | "warGame";
 type LobbyCursor = { x: number; y: number; name: string };
 
 export default function Home() {
@@ -20,6 +22,8 @@ export default function Home() {
   const [lobbyPlayerCount, setLobbyPlayerCount] = useState(0);
   const [lobbyCursors, setLobbyCursors] = useState<LobbyCursor[]>([]);
   const [logoAnimDone, setLogoAnimDone] = useState(false);
+  const [warWs, setWarWs] = useState<WebSocket | null>(null);
+  const [warMyId, setWarMyId] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lobbyWsRef = useRef<WebSocket | null>(null);
 
@@ -130,6 +134,23 @@ export default function Home() {
   const handleLogoComplete = useCallback(() => {
     setLogoAnimDone(true);
   }, []);
+
+  const handleWarStart = useCallback((ws: WebSocket, myId: string) => {
+    setWarWs(ws);
+    setWarMyId(myId);
+    setScreen("warGame");
+  }, []);
+
+  const handleWarBack = () => {
+    setScreen("start");
+  };
+
+  const handleWarExit = () => {
+    warWs?.close();
+    setWarWs(null);
+    setWarMyId("");
+    setScreen("start");
+  };
 
   const pillButton = (label: string, enabled: boolean, onClick: () => void) => (
     <button
@@ -347,6 +368,46 @@ export default function Home() {
                 {lobbyPlayerCount > 0 ? `${lobbyPlayerCount} ONLINE` : "CONNECTING..."}
               </div>
 
+              {/* 5v5 WAR button — desktop only */}
+              {!isMobile && (
+                <button
+                  onClick={() => {
+                    if (lobbyWsRef.current) {
+                      lobbyWsRef.current.close();
+                      lobbyWsRef.current = null;
+                    }
+                    setScreen("warLobby");
+                  }}
+                  style={{
+                    fontFamily: "Inter, sans-serif",
+                    fontSize: "1.1rem",
+                    fontWeight: "bold",
+                    color: "#fff",
+                    border: "2px solid rgba(255, 60, 60, 0.7)",
+                    borderRadius: "9999px",
+                    padding: "14px 48px",
+                    background: "rgba(255, 40, 20, 0.1)",
+                    cursor: "pointer",
+                    textShadow: "0 0 10px rgba(255, 60, 60, 0.8), 0 0 20px rgba(255, 30, 10, 0.5)",
+                    boxShadow: "0 0 15px rgba(255, 60, 60, 0.3), 0 0 30px rgba(255, 30, 10, 0.15), inset 0 0 15px rgba(255, 60, 60, 0.08)",
+                    letterSpacing: "0.15em",
+                    animation: "war-glow 2s ease-in-out infinite",
+                    transition: "all 0.3s",
+                    marginTop: 16,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(255, 40, 20, 0.25)";
+                    e.currentTarget.style.boxShadow = "0 0 25px rgba(255, 60, 60, 0.5), 0 0 50px rgba(255, 30, 10, 0.3), inset 0 0 20px rgba(255, 60, 60, 0.12)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "rgba(255, 40, 20, 0.1)";
+                    e.currentTarget.style.boxShadow = "0 0 15px rgba(255, 60, 60, 0.3), 0 0 30px rgba(255, 30, 10, 0.15), inset 0 0 15px rgba(255, 60, 60, 0.08)";
+                  }}
+                >
+                  ENTER 5v5 WAR
+                </button>
+              )}
+
               <button
                 onClick={() => setScreen("howItWorks")}
                 className="hiw-btn"
@@ -365,7 +426,7 @@ export default function Home() {
                   letterSpacing: "0.15em",
                   animation: "cyan-glow 2s ease-in-out infinite",
                   transition: "all 0.3s",
-                  marginTop: 28,
+                  marginTop: 14,
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = "rgba(34, 211, 238, 0.15)";
@@ -400,6 +461,26 @@ export default function Home() {
           <PongGame playerName={playerName} isMobile={isMobile} />
         </>
       )}
+
+      {screen === "warLobby" && (
+        <>
+          <SpaceBackground />
+          <WarLobby
+            playerName={playerName}
+            onGameStart={handleWarStart}
+            onBack={handleWarBack}
+          />
+        </>
+      )}
+
+      {screen === "warGame" && warWs && (
+        <WarGame
+          ws={warWs}
+          myId={warMyId}
+          playerName={playerName}
+          onExit={handleWarExit}
+        />
+      )}
       <style jsx>{`
         @keyframes cyan-glow {
           0%, 100% {
@@ -409,6 +490,16 @@ export default function Home() {
           50% {
             box-shadow: 0 0 20px rgba(34, 211, 238, 0.4), 0 0 40px rgba(34, 211, 238, 0.2), 0 0 60px rgba(34, 211, 238, 0.08), inset 0 0 15px rgba(34, 211, 238, 0.08);
             border-color: rgba(34, 211, 238, 0.8);
+          }
+        }
+        @keyframes war-glow {
+          0%, 100% {
+            box-shadow: 0 0 15px rgba(255, 60, 60, 0.3), 0 0 30px rgba(255, 30, 10, 0.15), inset 0 0 15px rgba(255, 60, 60, 0.08);
+            border-color: rgba(255, 60, 60, 0.7);
+          }
+          50% {
+            box-shadow: 0 0 25px rgba(255, 80, 80, 0.5), 0 0 50px rgba(255, 40, 20, 0.25), 0 0 70px rgba(255, 20, 0, 0.1), inset 0 0 20px rgba(255, 60, 60, 0.12);
+            border-color: rgba(255, 100, 100, 0.85);
           }
         }
         @keyframes fire-glow {

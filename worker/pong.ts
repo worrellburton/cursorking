@@ -665,8 +665,11 @@ export class PongRoom extends DurableObject {
   }
 }
 
+export { WarRoom } from "./war";
+
 export interface Env {
   PONG_ROOM: DurableObjectNamespace<PongRoom>;
+  WAR_ROOM: DurableObjectNamespace;
 }
 
 export default {
@@ -686,6 +689,12 @@ export default {
     if (url.pathname === "/ws" || url.pathname === "/") {
       const id = env.PONG_ROOM.idFromName("main");
       const room = env.PONG_ROOM.get(id);
+      return room.fetch(request);
+    }
+
+    if (url.pathname === "/war") {
+      const id = env.WAR_ROOM.idFromName("main-war");
+      const room = env.WAR_ROOM.get(id);
       return room.fetch(request);
     }
 
