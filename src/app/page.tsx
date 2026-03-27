@@ -19,7 +19,7 @@ export default function Home() {
   const [playerName, setPlayerName] = useState("");
   const [screen, setScreen] = useState<Screen>("name");
   const [isMobile, setIsMobile] = useState(false);
-  const [lobbyPlayerCount, setLobbyPlayerCount] = useState(0);
+  const [lobbyPlayerCount, setLobbyPlayerCount] = useState(-1); // -1 = not connected yet
   const [lobbyCursors, setLobbyCursors] = useState<LobbyCursor[]>([]);
   const [logoAnimDone, setLogoAnimDone] = useState(false);
   const [warWs, setWarWs] = useState<WebSocket | null>(null);
@@ -64,6 +64,8 @@ export default function Home() {
         isLobby = false;
         ws.close();
         lobbyWsRef.current = null;
+        // Worker is live but doesn't support lobby mode — show "LIVE" (count=0)
+        setLobbyPlayerCount(0);
         return;
       }
       if (msg.type === "player-count") {
@@ -72,6 +74,10 @@ export default function Home() {
       if (msg.type === "cursors") {
         setLobbyCursors(msg.cursors);
       }
+    };
+
+    ws.onerror = () => {
+      setLobbyPlayerCount(-1);
     };
 
     const onPointerMove = (e: PointerEvent) => {
@@ -384,12 +390,12 @@ export default function Home() {
                     width: 6,
                     height: 6,
                     borderRadius: "50%",
-                    background: lobbyPlayerCount > 0 ? "#22d3ee" : "rgba(255,255,255,0.2)",
-                    boxShadow: lobbyPlayerCount > 0 ? "0 0 8px rgba(34, 211, 238, 0.6)" : "none",
+                    background: lobbyPlayerCount >= 0 ? "#22c55e" : "rgba(255,255,255,0.2)",
+                    boxShadow: lobbyPlayerCount >= 0 ? "0 0 8px rgba(34, 197, 94, 0.6)" : "none",
                     display: "inline-block",
                   }}
                 />
-                {lobbyPlayerCount > 0 ? `${lobbyPlayerCount} ONLINE` : "CONNECTING..."}
+                {lobbyPlayerCount > 0 ? `${lobbyPlayerCount} ONLINE` : lobbyPlayerCount === 0 ? "LIVE" : "CONNECTING..."}
               </div>
 
               {/* 5v5 WAR button — desktop only */}
