@@ -202,30 +202,30 @@ export default function Home() {
 
               <button
                 onClick={() => setScreen("howItWorks")}
-                className="arena-btn"
+                className="hiw-btn"
                 style={{
                   fontFamily: "Inter, sans-serif",
                   fontSize: isMobile ? "0.7rem" : "0.8rem",
                   fontWeight: "bold",
                   color: "#fff",
-                  border: "1.5px solid rgba(255, 160, 50, 0.8)",
+                  border: "1.5px solid rgba(34, 211, 238, 0.6)",
                   borderRadius: "9999px",
                   padding: isMobile ? "8px 24px" : "10px 32px",
-                  background: "rgba(255, 80, 20, 0.1)",
+                  background: "rgba(34, 211, 238, 0.06)",
                   cursor: "pointer",
-                  textShadow: "0 0 10px rgba(255, 200, 50, 1), 0 0 20px rgba(255, 120, 20, 0.8), 0 0 40px rgba(255, 60, 10, 0.5)",
-                  boxShadow: "0 0 15px rgba(255, 120, 20, 0.4), 0 0 30px rgba(255, 60, 10, 0.2), inset 0 0 15px rgba(255, 120, 20, 0.1)",
+                  textShadow: "0 0 10px rgba(34, 211, 238, 0.8), 0 0 20px rgba(34, 211, 238, 0.4)",
+                  boxShadow: "0 0 12px rgba(34, 211, 238, 0.25), 0 0 24px rgba(34, 211, 238, 0.1), inset 0 0 10px rgba(34, 211, 238, 0.05)",
                   letterSpacing: "0.15em",
-                  animation: "fire-glow 1.5s ease-in-out infinite",
+                  animation: "cyan-glow 2s ease-in-out infinite",
                   transition: "all 0.3s",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(255, 80, 20, 0.25)";
-                  e.currentTarget.style.boxShadow = "0 0 25px rgba(255, 160, 50, 0.6), 0 0 50px rgba(255, 80, 20, 0.4), 0 0 80px rgba(255, 40, 0, 0.2), inset 0 0 25px rgba(255, 120, 20, 0.15)";
+                  e.currentTarget.style.background = "rgba(34, 211, 238, 0.15)";
+                  e.currentTarget.style.boxShadow = "0 0 20px rgba(34, 211, 238, 0.4), 0 0 40px rgba(34, 211, 238, 0.2), inset 0 0 15px rgba(34, 211, 238, 0.1)";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "rgba(255, 80, 20, 0.1)";
-                  e.currentTarget.style.boxShadow = "0 0 15px rgba(255, 120, 20, 0.4), 0 0 30px rgba(255, 60, 10, 0.2), inset 0 0 15px rgba(255, 120, 20, 0.1)";
+                  e.currentTarget.style.background = "rgba(34, 211, 238, 0.06)";
+                  e.currentTarget.style.boxShadow = "0 0 12px rgba(34, 211, 238, 0.25), 0 0 24px rgba(34, 211, 238, 0.1), inset 0 0 10px rgba(34, 211, 238, 0.05)";
                 }}
               >
                 HOW IT WORKS
@@ -253,6 +253,16 @@ export default function Home() {
         </>
       )}
       <style jsx>{`
+        @keyframes cyan-glow {
+          0%, 100% {
+            box-shadow: 0 0 12px rgba(34, 211, 238, 0.25), 0 0 24px rgba(34, 211, 238, 0.1), inset 0 0 10px rgba(34, 211, 238, 0.05);
+            border-color: rgba(34, 211, 238, 0.6);
+          }
+          50% {
+            box-shadow: 0 0 20px rgba(34, 211, 238, 0.4), 0 0 40px rgba(34, 211, 238, 0.2), 0 0 60px rgba(34, 211, 238, 0.08), inset 0 0 15px rgba(34, 211, 238, 0.08);
+            border-color: rgba(34, 211, 238, 0.8);
+          }
+        }
         @keyframes fire-glow {
           0%, 100% {
             box-shadow: 0 0 15px rgba(255, 120, 20, 0.4), 0 0 30px rgba(255, 60, 10, 0.2), inset 0 0 15px rgba(255, 120, 20, 0.1);

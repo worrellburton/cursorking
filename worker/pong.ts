@@ -190,6 +190,7 @@ export class PongRoom extends DurableObject {
     // Swept collision helper: check if ball crossed paddle during this tick
     const prevBallX = ball.x - ball.vx;
     const prevBallY = ball.y - ball.vy;
+    let paddleHit = false;
 
     // Left paddle collision
     const lp = paddles.left;
@@ -217,6 +218,7 @@ export class PongRoom extends DurableObject {
         ball.y = crossY;
         ball.vx = Math.abs(speed * Math.cos(angle));
         ball.vy = speed * Math.sin(angle);
+        paddleHit = true;
       }
     }
     // Ball moving right, crossed into paddle from left side
@@ -231,6 +233,7 @@ export class PongRoom extends DurableObject {
         ball.y = crossY;
         ball.vx = -Math.abs(speed * Math.cos(angle));
         ball.vy = speed * Math.sin(angle);
+        paddleHit = true;
       }
     }
     // Ball currently overlapping paddle (fallback for slow speeds)
@@ -249,6 +252,7 @@ export class PongRoom extends DurableObject {
         ball.vx = Math.abs(speed * Math.cos(angle));
       }
       ball.vy = speed * Math.sin(angle);
+      paddleHit = true;
     }
 
     // Right paddle collision
@@ -270,6 +274,7 @@ export class PongRoom extends DurableObject {
         ball.y = crossY;
         ball.vx = -Math.abs(speed * Math.cos(angle));
         ball.vy = speed * Math.sin(angle);
+        paddleHit = true;
       }
     }
     // Ball moving left, crossed into paddle from right side
@@ -284,6 +289,7 @@ export class PongRoom extends DurableObject {
         ball.y = crossY;
         ball.vx = Math.abs(speed * Math.cos(angle));
         ball.vy = speed * Math.sin(angle);
+        paddleHit = true;
       }
     }
     // Ball currently overlapping paddle (fallback)
@@ -302,6 +308,12 @@ export class PongRoom extends DurableObject {
         ball.vx = -Math.abs(speed * Math.cos(angle));
       }
       ball.vy = speed * Math.sin(angle);
+      paddleHit = true;
+    }
+
+    // Broadcast paddle hit for sound effect
+    if (paddleHit) {
+      this.broadcast(JSON.stringify({ type: "paddle-hit" }));
     }
 
     // Paddle-ball push: if paddle moved into ball, push ball with momentum

@@ -102,6 +102,7 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
       nextRound: `${base}/Next Round.mp3`,
       youWin: `${base}/YOU WIN.mp3`,
       youLost: `${base}/You Lost.mp3`,
+      hit: `${base}/hit.mp3`,
     };
     const loaded: Record<string, HTMLAudioElement> = {};
     for (const [key, src] of Object.entries(sounds)) {
@@ -195,6 +196,9 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         }
         if (msg.type === "point-scored") {
           playSfx("roundStart");
+        }
+        if (msg.type === "paddle-hit") {
+          playSfx("hit");
         }
         if (msg.type === "bullet-hit") {
           const role = myRoleRef.current;
