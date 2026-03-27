@@ -369,11 +369,11 @@ export class PongRoom extends DurableObject {
         continue;
       }
 
-      // Check hit against opponent cursor
+      // Check hit against opponent paddle
       const target: "left" | "right" = b.owner === "left" ? "right" : "left";
-      const cursor = this.cursorPositions[target];
-      const dx = b.x - cursor.x;
-      const dy = b.y - cursor.y;
+      const targetPaddle = paddles[target];
+      const dx = b.x - targetPaddle.x;
+      const dy = b.y - targetPaddle.y;
       if (Math.sqrt(dx * dx + dy * dy) < BULLET_HIT_RADIUS) {
         this.slowedUntil[target] = now + SLOW_DURATION;
         this.bullets.splice(i, 1);
@@ -577,11 +577,11 @@ export class PongRoom extends DurableObject {
 
     if (data.type === "grab-pickup") {
       if (this.pickup.active) {
-        // Check if cursor is close enough to pickup
-        const cursor = this.cursorPositions[role];
-        const dx = cursor.x - this.pickup.x;
-        const dy = cursor.y - this.pickup.y;
-        if (Math.sqrt(dx * dx + dy * dy) < BULLET_PICKUP_RADIUS * 2) {
+        // Check if paddle is close enough to pickup (more lenient)
+        const paddle = this.state_.paddles[role];
+        const dx = paddle.x - this.pickup.x;
+        const dy = paddle.y - this.pickup.y;
+        if (Math.sqrt(dx * dx + dy * dy) < 0.2) {
           this.pickup.active = false;
           this.ammo[role] += 3;
           this.nextPickupTime = Date.now() + PICKUP_SPAWN_INTERVAL;
@@ -593,9 +593,9 @@ export class PongRoom extends DurableObject {
     if (data.type === "fire-bullet") {
       if (this.ammo[role] > 0 && this.running) {
         this.ammo[role]--;
-        const cursor = this.cursorPositions[role];
+        const paddle = this.state_.paddles[role];
         const vx = role === "left" ? BULLET_SPEED : -BULLET_SPEED;
-        this.bullets.push({ x: cursor.x, y: cursor.y, vx, owner: role });
+        this.bullets.push({ x: paddle.x, y: paddle.y, vx, owner: role });
       }
     }
   }

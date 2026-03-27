@@ -205,7 +205,7 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
     sendPaddleFromScreen(e.clientX, e.clientY);
   }, [sendPaddleFromScreen]);
 
-  // Click handler: grab pickup or fire bullet
+  // Click/tap handler: grab pickup or fire bullet
   const handleClick = useCallback(() => {
     const role = myRoleRef.current;
     if (role === "spectator") return;
@@ -227,7 +227,7 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
       }
       const dx = mx - pickupScreenX;
       const dy = my - pickupScreenY;
-      if (Math.sqrt(dx * dx + dy * dy) < 0.12) {
+      if (Math.sqrt(dx * dx + dy * dy) < 0.15) {
         wsRef.current?.send(JSON.stringify({ type: "grab-pickup" }));
         return;
       }
@@ -237,7 +237,7 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
     if ((state.ammo?.[role] ?? 0) > 0) {
       wsRef.current?.send(JSON.stringify({ type: "fire-bullet" }));
     }
-  }, []);
+  }, [isMobile]);
 
   // Touch handler for mobile
   const handleTouchMove = useCallback((e: TouchEvent) => {
@@ -248,25 +248,42 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
     sendPaddleFromScreen(touch.clientX, touch.clientY);
   }, [sendPaddleFromScreen]);
 
+  // Track touch tap vs drag for firing
+  const touchStartPosRef = useRef({ x: 0, y: 0 });
+
   const handleTouchStart = useCallback((e: TouchEvent) => {
     e.preventDefault();
     const touch = e.touches[0];
     if (!touch) return;
     mouseRef.current = { x: touch.clientX, y: touch.clientY };
+    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
   }, []);
+
+  const handleTouchEnd = useCallback((e: TouchEvent) => {
+    // If touch didn't move much, treat as a tap (fire/grab)
+    const start = touchStartPosRef.current;
+    const mouse = mouseRef.current;
+    const dx = mouse.x - start.x;
+    const dy = mouse.y - start.y;
+    if (Math.sqrt(dx * dx + dy * dy) < 20) {
+      handleClick();
+    }
+  }, [handleClick]);
 
   useEffect(() => {
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("click", handleClick);
     window.addEventListener("touchmove", handleTouchMove, { passive: false });
     window.addEventListener("touchstart", handleTouchStart, { passive: false });
+    window.addEventListener("touchend", handleTouchEnd);
     return () => {
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("click", handleClick);
       window.removeEventListener("touchmove", handleTouchMove);
       window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchend", handleTouchEnd);
     };
-  }, [handlePointerMove, handleClick, handleTouchMove, handleTouchStart]);
+  }, [handlePointerMove, handleClick, handleTouchMove, handleTouchStart, handleTouchEnd]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
