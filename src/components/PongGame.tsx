@@ -814,7 +814,7 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         ctx.shadowColor = "rgba(255, 255, 255, 0.6)";
         ctx.shadowBlur = 10 + 8 * Math.sin(t);
         ctx.globalAlpha = pulse;
-        ctx.translate(W / 2, H / 2);
+        ctx.translate(W / 2, H - 60);
         ctx.scale(scalePulse, scalePulse);
         ctx.fillText(text, 0, 0);
         ctx.globalAlpha = 1;
