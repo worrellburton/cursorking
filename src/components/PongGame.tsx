@@ -20,6 +20,7 @@ type PaddleState = { x: number; y: number };
 
 type GameState = {
   ball: { x: number; y: number };
+  ballSize: number;
   paddles: { left: PaddleState; right: PaddleState };
   score: { left: number; right: number };
   names: { left: string; right: string };
@@ -51,6 +52,7 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
   // All game state lives in refs — zero React re-renders during gameplay
   const gameStateRef = useRef<GameState>({
     ball: { x: 0.5, y: 0.5 },
+    ballSize: 0.018,
     paddles: { left: { x: 0.04, y: 0.5 }, right: { x: 0.96, y: 0.5 } },
     score: { left: 0, right: 0 },
     names: { left: "", right: "" },
@@ -172,9 +174,11 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
     const screenNY = Math.max(0, Math.min(1, clientY / h));
 
     // Convert screen coords to server coords on mobile
+    // Offset paddle above thumb so it's visible (shift up ~8% of screen)
     let serverX: number, serverY: number;
     if (isMobile) {
-      const s = screenToServer(screenNX, screenNY, role);
+      const offsetY = screenNY - 0.08;
+      const s = screenToServer(screenNX, Math.max(0, Math.min(1, offsetY)), role);
       serverX = s.x;
       serverY = s.y;
     } else {
@@ -356,7 +360,9 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         paddleH = PADDLE_HEIGHT * (H / 500);
         paddleW = PADDLE_WIDTH * (W / 800);
       }
-      const ballR = BALL_SIZE * Math.min(W / 800, H / 500);
+      // Ball size from server (normalized) — converts to pixels, with fallback
+      const serverBallSize = state.ballSize ?? 0.018;
+      const ballR = serverBallSize * Math.max(W, H);
 
       // Determine which paddle is "mine" and which is "opponent" for coloring on mobile
       const myColor = role === "left" ? "#22d3ee" : "#f43f5e";

@@ -2,10 +2,11 @@ import { DurableObject } from "cloudflare:workers";
 
 const PADDLE_HEIGHT = 0.14;
 const PADDLE_WIDTH = 0.018;
-const BALL_SIZE = 0.009;
+const BALL_SIZE_START = 0.018;
+const BALL_SIZE_MIN = 0.006;
 const BALL_SPEED = 0.007;
-const BALL_ACCEL = 1.04;
-const BALL_TICK_ACCEL = 1.0002;
+const BALL_ACCEL = 1.06;
+const BALL_TICK_ACCEL = 1.0004;
 const WIN_SCORE = 3;
 const RESTART_DELAY = 3000;
 
@@ -28,6 +29,7 @@ type GameState = {
   ball: { x: number; y: number; vx: number; vy: number };
   paddles: { left: PaddleState; right: PaddleState };
   score: { left: number; right: number };
+  rallyTicks: number; // tracks how long ball has been in play for size/speed scaling
 };
 
 export class PongRoom extends DurableObject {
@@ -77,6 +79,7 @@ export class PongRoom extends DurableObject {
         right: { x: 0.96, y: 0.5 },
       },
       score: { left: 0, right: 0 },
+      rallyTicks: 0,
     };
   }
 
@@ -89,6 +92,7 @@ export class PongRoom extends DurableObject {
       vx: BALL_SPEED * dir * Math.cos(angle),
       vy: BALL_SPEED * Math.sin(angle),
     };
+    this.state_.rallyTicks = 0;
   }
 
   getNameForRole(role: "left" | "right"): string {
@@ -160,12 +164,18 @@ export class PongRoom extends DurableObject {
     const { ball, paddles } = this.state_;
     const now = Date.now();
 
-    // Continuous speed increase every tick
+    // Track rally length for ball size scaling
+    this.state_.rallyTicks++;
+
+    // Continuous speed increase every tick (exponential)
     ball.vx *= BALL_TICK_ACCEL;
     ball.vy *= BALL_TICK_ACCEL;
 
     ball.x += ball.vx;
     ball.y += ball.vy;
+
+    // Dynamic ball size: starts big, shrinks over time
+    const BALL_SIZE = Math.max(BALL_SIZE_MIN, BALL_SIZE_START - this.state_.rallyTicks * 0.00003);
 
     // Top/bottom bounce
     if (ball.y - BALL_SIZE <= 0) {
@@ -440,6 +450,7 @@ export class PongRoom extends DurableObject {
         type: "game-state",
         state: {
           ball: { x: this.state_.ball.x, y: this.state_.ball.y },
+          ballSize: Math.max(BALL_SIZE_MIN, BALL_SIZE_START - this.state_.rallyTicks * 0.00003),
           paddles: this.state_.paddles,
           score: this.state_.score,
           names: {
@@ -493,6 +504,7 @@ export class PongRoom extends DurableObject {
         type: "game-state",
         state: {
           ball: { x: this.state_.ball.x, y: this.state_.ball.y },
+          ballSize: Math.max(BALL_SIZE_MIN, BALL_SIZE_START - this.state_.rallyTicks * 0.00003),
           paddles: this.state_.paddles,
           score: this.state_.score,
           names: {
