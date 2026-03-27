@@ -731,13 +731,25 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
       // Waiting for player message
       if (count < 2 && !state.winner && role !== "spectator") {
         ctx.save();
+        const t = Date.now() / 400;
+        const pulse = 0.6 + 0.4 * Math.sin(t);
+        const scalePulse = 1 + 0.03 * Math.sin(t * 0.7);
         const waitSize = Math.max(16, Math.floor(H * 0.03));
-        ctx.font = `${waitSize}px 'Courier New', monospace`;
+
+        // Animated dots: cycle 0-3 dots
+        const dotCount = Math.floor((Date.now() / 500) % 4);
+        const dots = ".".repeat(dotCount);
+        const text = `WAITING FOR PLAYER${dots}`;
+
+        ctx.font = `bold ${waitSize}px 'Courier New', monospace`;
         ctx.textAlign = "center";
-        ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
-        const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 500);
-        ctx.globalAlpha = 0.4 + pulse * 0.3;
-        ctx.fillText("WAITING FOR PLAYER...", W / 2, H / 2);
+        ctx.fillStyle = "#ffffff";
+        ctx.shadowColor = "rgba(255, 255, 255, 0.6)";
+        ctx.shadowBlur = 10 + 8 * Math.sin(t);
+        ctx.globalAlpha = pulse;
+        ctx.translate(W / 2, H / 2);
+        ctx.scale(scalePulse, scalePulse);
+        ctx.fillText(text, 0, 0);
         ctx.globalAlpha = 1;
         ctx.restore();
       }
