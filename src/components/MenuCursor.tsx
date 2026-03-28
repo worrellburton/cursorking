@@ -40,17 +40,15 @@ export default function MenuCursor({ name }: { name: string }) {
         return;
       }
 
-      // Glow
-      const glowGrad = ctx.createRadialGradient(x, y, 0, x, y, 50);
-      glowGrad.addColorStop(0, "rgba(34, 211, 238, 0.18)");
-      glowGrad.addColorStop(0.5, "rgba(34, 211, 238, 0.06)");
-      glowGrad.addColorStop(1, "rgba(34, 211, 238, 0)");
-      ctx.fillStyle = glowGrad;
+      // Glow — simple circle, no gradient
+      ctx.globalAlpha = 0.12;
+      ctx.fillStyle = "#22d3ee";
       ctx.beginPath();
-      ctx.arc(x, y, 50, 0, Math.PI * 2);
+      ctx.arc(x, y, 30, 0, Math.PI * 2);
       ctx.fill();
+      ctx.globalAlpha = 1;
 
-      // Cursor arrow
+      // Cursor arrow — no shadowBlur
       ctx.save();
       ctx.translate(x, y);
       ctx.beginPath();
@@ -63,8 +61,6 @@ export default function MenuCursor({ name }: { name: string }) {
       ctx.lineTo(13, 12);
       ctx.closePath();
       ctx.fillStyle = "#22d3ee";
-      ctx.shadowColor = "#22d3ee";
-      ctx.shadowBlur = 10;
       ctx.fill();
       ctx.strokeStyle = "rgba(0,0,0,0.4)";
       ctx.lineWidth = 0.5;
@@ -92,8 +88,6 @@ export default function MenuCursor({ name }: { name: string }) {
 
       // Text
       ctx.fillStyle = "#22d3ee";
-      ctx.shadowColor = "#22d3ee";
-      ctx.shadowBlur = 6;
       ctx.fillText(text, labelX, labelY + 2);
       ctx.restore();
 

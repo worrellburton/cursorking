@@ -74,22 +74,26 @@ export default function SpaceBackground() {
       ctx.fillStyle = "#050510";
       ctx.fillRect(0, 0, W, H);
 
-      // Nebula layers (desktop only)
+      // Nebula layers (desktop only) — simple circles, no gradients
       for (const n of nebulae) {
         const nx = (n.x + Math.sin(time * 0.1 + n.phase) * 0.02) * W;
         const ny = (n.y + Math.cos(time * 0.08 + n.phase) * 0.02) * H;
         const nr = n.r * Math.min(W, H);
         const pulse = 0.8 + 0.2 * Math.sin(time * 0.3 + n.phase);
 
-        const grad = ctx.createRadialGradient(nx, ny, 0, nx, ny, nr);
-        grad.addColorStop(0, `hsla(${n.hue}, 70%, 50%, ${0.04 * pulse})`);
-        grad.addColorStop(0.5, `hsla(${n.hue}, 60%, 40%, ${0.02 * pulse})`);
-        grad.addColorStop(1, "transparent");
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, W, H);
+        ctx.globalAlpha = 0.03 * pulse;
+        ctx.fillStyle = n.hue === 200 ? "#4488cc" : "#8844cc";
+        ctx.beginPath();
+        ctx.arc(nx, ny, nr, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 0.015 * pulse;
+        ctx.beginPath();
+        ctx.arc(nx, ny, nr * 0.6, 0, Math.PI * 2);
+        ctx.fill();
       }
+      ctx.globalAlpha = 1;
 
-      // Stars
+      // Stars — simple dots, no per-star gradients
       for (const star of stars) {
         star.y -= star.speed;
         if (star.y < -0.01) {
@@ -103,23 +107,22 @@ export default function SpaceBackground() {
         const sx = star.x * W;
         const sy = star.y * H;
 
-        // Glow (desktop only, bright stars only)
+        // Bright star glow: simple larger circle at low opacity
         if (!mob && star.z > 0.7) {
-          const glowR = size * 4;
-          const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, glowR);
-          glow.addColorStop(0, `hsla(${star.hue}, 30%, 90%, ${alpha * 0.3})`);
-          glow.addColorStop(1, "transparent");
-          ctx.fillStyle = glow;
+          ctx.globalAlpha = alpha * 0.15;
+          ctx.fillStyle = "#cceeff";
           ctx.beginPath();
-          ctx.arc(sx, sy, glowR, 0, Math.PI * 2);
+          ctx.arc(sx, sy, size * 3, 0, Math.PI * 2);
           ctx.fill();
         }
 
-        ctx.fillStyle = `hsla(${star.hue}, 20%, 95%, ${alpha})`;
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = "#f0f4ff";
         ctx.beginPath();
         ctx.arc(sx, sy, size, 0, Math.PI * 2);
         ctx.fill();
       }
+      ctx.globalAlpha = 1;
 
       // Shooting stars (reduced chance on mobile)
       if (Math.random() < (mob ? 0.001 : SHOOTING_STAR_CHANCE)) {
@@ -151,40 +154,22 @@ export default function SpaceBackground() {
         const tailLen = 40 + (1 - progress) * 40;
         const norm = Math.sqrt(ss.vx * ss.vx + ss.vy * ss.vy);
 
-        if (mob) {
-          // Simple line on mobile (no gradients)
-          ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(ss.x, ss.y);
-          ctx.lineTo(ss.x - (ss.vx / norm) * tailLen, ss.y + (ss.vy / norm) * tailLen);
-          ctx.stroke();
-        } else {
-          const grad = ctx.createLinearGradient(
-            ss.x, ss.y,
-            ss.x - ss.vx * tailLen / norm,
-            ss.y + ss.vy * tailLen / norm,
-          );
-          grad.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
-          grad.addColorStop(0.3, `rgba(200, 220, 255, ${alpha * 0.5})`);
-          grad.addColorStop(1, "transparent");
+        // Simple line for both mobile and desktop (no gradients)
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = mob ? 1 : 1.5;
+        ctx.beginPath();
+        ctx.moveTo(ss.x, ss.y);
+        ctx.lineTo(ss.x - (ss.vx / norm) * tailLen, ss.y + (ss.vy / norm) * tailLen);
+        ctx.stroke();
 
-          ctx.strokeStyle = grad;
-          ctx.lineWidth = 1.5;
+        if (!mob) {
+          ctx.fillStyle = "#ffffff";
           ctx.beginPath();
-          ctx.moveTo(ss.x, ss.y);
-          ctx.lineTo(ss.x - (ss.vx / norm) * tailLen, ss.y + (ss.vy / norm) * tailLen);
-          ctx.stroke();
-
-          // Head glow
-          const headGlow = ctx.createRadialGradient(ss.x, ss.y, 0, ss.x, ss.y, 6);
-          headGlow.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
-          headGlow.addColorStop(1, "transparent");
-          ctx.fillStyle = headGlow;
-          ctx.beginPath();
-          ctx.arc(ss.x, ss.y, 6, 0, Math.PI * 2);
+          ctx.arc(ss.x, ss.y, 3, 0, Math.PI * 2);
           ctx.fill();
         }
+        ctx.globalAlpha = 1;
       }
 
       animId = requestAnimationFrame(draw);

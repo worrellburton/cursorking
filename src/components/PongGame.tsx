@@ -477,10 +477,8 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
       const hitAge = Date.now() - bulletHitFlashRef.current;
       if (hitAge < 500) {
         const flashAlpha = 0.15 * (1 - hitAge / 500);
-        ctx.save();
         ctx.fillStyle = `rgba(255, 0, 0, ${flashAlpha})`;
         ctx.fillRect(0, 0, W, H);
-        ctx.restore();
       }
 
       // Center line
@@ -564,29 +562,35 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         }
       }
 
-      // Left paddle (on mobile: could be top or bottom depending on role)
-      ctx.save();
-      ctx.shadowColor = "#22d3ee";
-      ctx.shadowBlur = state.slowed?.left ? 40 : 20;
-      ctx.fillStyle = state.slowed?.left ? "#ff4444" : "#22d3ee";
+      // Left paddle
+      const leftPaddleColor = state.slowed?.left ? "#ff4444" : "#22d3ee";
       const lx = paddleLeftX - paddleW / 2;
       const ly = paddleLeftY - paddleH / 2;
+      ctx.globalAlpha = 0.25;
+      ctx.fillStyle = leftPaddleColor;
+      ctx.beginPath();
+      ctx.roundRect(lx - 4, ly - 4, paddleW + 8, paddleH + 8, 6);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = leftPaddleColor;
       ctx.beginPath();
       ctx.roundRect(lx, ly, paddleW, paddleH, 4);
       ctx.fill();
-      ctx.restore();
 
       // Right paddle
-      ctx.save();
-      ctx.shadowColor = "#f43f5e";
-      ctx.shadowBlur = state.slowed?.right ? 40 : 20;
-      ctx.fillStyle = state.slowed?.right ? "#ff4444" : "#f43f5e";
+      const rightPaddleColor = state.slowed?.right ? "#ff4444" : "#f43f5e";
       const rx = paddleRightX - paddleW / 2;
       const ry = paddleRightY - paddleH / 2;
+      ctx.globalAlpha = 0.25;
+      ctx.fillStyle = rightPaddleColor;
+      ctx.beginPath();
+      ctx.roundRect(rx - 4, ry - 4, paddleW + 8, paddleH + 8, 6);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = rightPaddleColor;
       ctx.beginPath();
       ctx.roundRect(rx, ry, paddleW, paddleH, 4);
       ctx.fill();
-      ctx.restore();
 
       // Compute ball speed for glow scaling
       const prev = prevBallRef.current;
@@ -598,55 +602,47 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
 
       const speedFactor = Math.min(3, 1 + ballSpeedRef.current / 8);
 
-      // Ball trail — grows longer and bigger with speed
+      // Ball trail — simple circles, no gradients
       const trail = ballTrailRef.current;
       trail.push({ x: ballX, y: ballY, age: 0 });
-      const maxTrail = Math.floor(10 + speedFactor * 15); // 10 at slow, up to 55 at max speed
+      const maxTrail = Math.floor(8 + speedFactor * 10);
       while (trail.length > maxTrail) trail.shift();
 
-      const trailLife = 15 + speedFactor * 15; // trail fades slower at high speed
+      const trailLife = 12 + speedFactor * 12;
       for (let i = 0; i < trail.length; i++) {
         trail[i].age++;
         const tt = trail[i];
         const life = 1 - tt.age / trailLife;
         if (life <= 0) continue;
 
-        const r = ballR * life * (0.6 + speedFactor * 0.3);
-        const trailGlowR = r * (2 + speedFactor * 1.5);
-        const grad = ctx.createRadialGradient(tt.x, tt.y, 0, tt.x, tt.y, trailGlowR);
-        grad.addColorStop(0, `rgba(255, 200, 50, ${life * 0.5 * speedFactor})`);
-        grad.addColorStop(0.3, `rgba(255, 100, 20, ${life * 0.4 * speedFactor})`);
-        grad.addColorStop(0.6, `rgba(200, 30, 0, ${life * 0.15 * speedFactor})`);
-        grad.addColorStop(1, "rgba(100, 0, 0, 0)");
-        ctx.fillStyle = grad;
+        const r = ballR * life * (0.8 + speedFactor * 0.4);
+        ctx.globalAlpha = life * 0.5 * Math.min(speedFactor, 2);
+        ctx.fillStyle = life > 0.5 ? "#ffc832" : life > 0.25 ? "#ff6414" : "#cc2000";
         ctx.beginPath();
-        ctx.arc(tt.x, tt.y, trailGlowR, 0, Math.PI * 2);
+        ctx.arc(tt.x, tt.y, r * 1.5, 0, Math.PI * 2);
         ctx.fill();
       }
+      ctx.globalAlpha = 1;
 
-      // Ball
-      ctx.save();
-      const ballGlowR = ballR * (3 + speedFactor * 1.5);
-      const ballGrad = ctx.createRadialGradient(ballX, ballY, 0, ballX, ballY, ballGlowR);
-      ballGrad.addColorStop(0, "rgba(255, 255, 255, 1)");
-      ballGrad.addColorStop(0.15, `rgba(255, 240, 180, ${0.7 + speedFactor * 0.1})`);
-      ballGrad.addColorStop(0.3, `rgba(255, 160, 50, ${0.3 + speedFactor * 0.15})`);
-      ballGrad.addColorStop(0.6, `rgba(255, 60, 10, ${0.1 + speedFactor * 0.1})`);
-      ballGrad.addColorStop(1, "rgba(200, 0, 0, 0)");
-      ctx.fillStyle = ballGrad;
+      // Ball — one glow layer + core, no shadowBlur
+      const ballGlowR = ballR * (2.5 + speedFactor);
+      ctx.globalAlpha = 0.4 + speedFactor * 0.1;
+      ctx.fillStyle = "#ff8020";
       ctx.beginPath();
       ctx.arc(ballX, ballY, ballGlowR, 0, Math.PI * 2);
       ctx.fill();
-
-      ctx.shadowColor = "#ffffff";
-      ctx.shadowBlur = 15 + speedFactor * 10;
+      ctx.globalAlpha = 0.7;
+      ctx.fillStyle = "#ffcc66";
+      ctx.beginPath();
+      ctx.arc(ballX, ballY, ballR * 1.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
       ctx.fillStyle = "#ffffff";
       ctx.beginPath();
       ctx.arc(ballX, ballY, ballR, 0, Math.PI * 2);
       ctx.fill();
-      ctx.restore();
 
-      // Bullets
+      // Bullets — simple circles, no gradients or shadowBlur
       if (state.bullets) {
         for (const b of state.bullets) {
           const bs = toScreen(b.x, b.y);
@@ -654,36 +650,26 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
           const by = bs.y;
           const bulletColor = b.owner === "left" ? "#22d3ee" : "#f43f5e";
 
-          ctx.save();
-          // Bullet glow
-          const bGrad = ctx.createRadialGradient(bx, by, 0, bx, by, 12);
-          bGrad.addColorStop(0, bulletColor);
-          bGrad.addColorStop(0.5, `${bulletColor}66`);
-          bGrad.addColorStop(1, "transparent");
-          ctx.fillStyle = bGrad;
+          ctx.globalAlpha = 0.3;
+          ctx.fillStyle = bulletColor;
           ctx.beginPath();
-          ctx.arc(bx, by, 12, 0, Math.PI * 2);
+          ctx.arc(bx, by, 10, 0, Math.PI * 2);
           ctx.fill();
-
-          // Bullet core
-          ctx.shadowColor = bulletColor;
-          ctx.shadowBlur = 15;
+          ctx.globalAlpha = 1;
           ctx.fillStyle = "#ffffff";
           ctx.beginPath();
           ctx.arc(bx, by, 3, 0, Math.PI * 2);
           ctx.fill();
-          ctx.restore();
         }
       }
 
-      // Bullet pickup
+      // Bullet pickup — simplified, no gradients or shadowBlur
       if (state.pickup?.active) {
         const ps = toScreen(state.pickup.x, state.pickup.y);
         const px = ps.x;
         const py = ps.y;
         const pulse = 0.7 + 0.3 * Math.sin(Date.now() / 300);
 
-        ctx.save();
         // Outer pulse ring
         ctx.strokeStyle = `rgba(255, 220, 50, ${pulse * 0.4})`;
         ctx.lineWidth = 2;
@@ -692,19 +678,14 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         ctx.stroke();
 
         // Pickup glow
-        const pGrad = ctx.createRadialGradient(px, py, 0, px, py, 40);
-        pGrad.addColorStop(0, `rgba(255, 220, 50, ${pulse})`);
-        pGrad.addColorStop(0.3, `rgba(255, 160, 20, ${pulse * 0.6})`);
-        pGrad.addColorStop(0.6, `rgba(255, 100, 0, ${pulse * 0.2})`);
-        pGrad.addColorStop(1, "transparent");
-        ctx.fillStyle = pGrad;
+        ctx.globalAlpha = pulse * 0.3;
+        ctx.fillStyle = "#ffdd33";
         ctx.beginPath();
-        ctx.arc(px, py, 40, 0, Math.PI * 2);
+        ctx.arc(px, py, 30, 0, Math.PI * 2);
         ctx.fill();
 
         // Pickup icon
-        ctx.shadowColor = "#ffdd33";
-        ctx.shadowBlur = 25;
+        ctx.globalAlpha = 1;
         ctx.fillStyle = "#ffdd33";
         ctx.beginPath();
         ctx.arc(px, py, 10, 0, Math.PI * 2);
@@ -714,28 +695,22 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         ctx.font = `bold 13px 'Inter', sans-serif`;
         ctx.textAlign = "center";
         ctx.fillStyle = "#ffdd33";
-        ctx.shadowBlur = 10;
         ctx.fillText("AMMO x3", px, py + 28);
-        ctx.restore();
       }
 
-      // Ammo counter
+      // Ammo counter — no shadowBlur
       if (role === "left" || role === "right") {
         const myAmmo = state.ammo?.[role] ?? 0;
         if (myAmmo > 0) {
-          ctx.save();
           const ammoX = mob ? W - 30 : W / 2;
           const ammoY = mob ? H / 2 : H - 30;
           const bulletColor = role === "left" ? "#22d3ee" : "#f43f5e";
 
-          // Draw bullet dots
+          ctx.fillStyle = bulletColor;
           for (let i = 0; i < myAmmo; i++) {
             const dotOffset = mob ? 0 : (- (myAmmo - 1) * 12 / 2 + i * 12);
             const dotX = mob ? ammoX : ammoX + dotOffset;
             const dotY = mob ? ammoY - (myAmmo - 1) * 12 / 2 + i * 12 : ammoY;
-            ctx.shadowColor = bulletColor;
-            ctx.shadowBlur = 10;
-            ctx.fillStyle = bulletColor;
             ctx.beginPath();
             ctx.arc(dotX, dotY, 4, 0, Math.PI * 2);
             ctx.fill();
@@ -744,41 +719,25 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
           ctx.font = `bold 10px 'Inter', sans-serif`;
           ctx.textAlign = "center";
           ctx.fillStyle = "rgba(255,255,255,0.5)";
-          ctx.shadowBlur = 0;
           ctx.fillText(mob ? "TAP" : "CLICK TO FIRE", ammoX, mob ? ammoY + (myAmmo * 12 / 2) + 16 : ammoY + 16);
-          ctx.restore();
         }
       }
 
       // Slowed indicator
       if (role !== "spectator" && state.slowed?.[role]) {
-        ctx.save();
         const slowSize = Math.max(14, Math.floor(H * 0.022));
         ctx.font = `bold ${slowSize}px 'Inter', sans-serif`;
         ctx.textAlign = "center";
         ctx.fillStyle = "#ff4444";
-        ctx.shadowColor = "#ff4444";
-        ctx.shadowBlur = 15;
         const blink = Math.sin(Date.now() / 150) > 0 ? 1 : 0.3;
         ctx.globalAlpha = blink;
         ctx.fillText("SLOWED!", W / 2, mob ? H * 0.85 : H * 0.12);
         ctx.globalAlpha = 1;
-        ctx.restore();
       }
 
-      // Cursor / touch indicator
-      ctx.save();
+      // Cursor / touch indicator — no gradients or shadowBlur
       if (mob) {
-        // Mobile: show thumb/touch circle
         const touchColor = role === "left" ? "#22d3ee" : role === "right" ? "#f43f5e" : "#ffffff";
-        const touchGrad = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 36);
-        touchGrad.addColorStop(0, `${touchColor}44`);
-        touchGrad.addColorStop(0.6, `${touchColor}18`);
-        touchGrad.addColorStop(1, "transparent");
-        ctx.fillStyle = touchGrad;
-        ctx.beginPath();
-        ctx.arc(mouse.x, mouse.y, 36, 0, Math.PI * 2);
-        ctx.fill();
 
         // Touch ring
         ctx.strokeStyle = `${touchColor}88`;
@@ -793,18 +752,14 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         ctx.arc(mouse.x, mouse.y, 4, 0, Math.PI * 2);
         ctx.fill();
       } else {
-        // Desktop: cursor arrow + glow
-        const cursorColor = "#ffffff";
-        const glowRGB = "255, 255, 255";
-
-        const glowGrad = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 50);
-        glowGrad.addColorStop(0, `rgba(${glowRGB}, 0.15)`);
-        glowGrad.addColorStop(0.5, `rgba(${glowRGB}, 0.05)`);
-        glowGrad.addColorStop(1, `rgba(${glowRGB}, 0)`);
-        ctx.fillStyle = glowGrad;
+        // Desktop: cursor arrow, no gradient glow
+        ctx.save();
+        ctx.globalAlpha = 0.12;
+        ctx.fillStyle = "#ffffff";
         ctx.beginPath();
-        ctx.arc(mouse.x, mouse.y, 50, 0, Math.PI * 2);
+        ctx.arc(mouse.x, mouse.y, 35, 0, Math.PI * 2);
         ctx.fill();
+        ctx.globalAlpha = 1;
 
         ctx.translate(mouse.x, mouse.y);
         ctx.beginPath();
@@ -816,9 +771,7 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         ctx.lineTo(8, 13);
         ctx.lineTo(13, 12);
         ctx.closePath();
-        ctx.fillStyle = cursorColor;
-        ctx.shadowColor = cursorColor;
-        ctx.shadowBlur = 10;
+        ctx.fillStyle = "#ffffff";
         ctx.fill();
         ctx.strokeStyle = "rgba(0,0,0,0.5)";
         ctx.lineWidth = 0.5;
@@ -832,22 +785,17 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
           ctx.textAlign = "left";
           const nameColor = role === "left" ? "#22d3ee" : "#f43f5e";
           ctx.fillStyle = nameColor;
-          ctx.shadowColor = nameColor;
-          ctx.shadowBlur = 8;
           ctx.fillText(myName.toUpperCase(), 18, 28);
         }
+        ctx.restore();
       }
-      ctx.restore();
 
       // Waiting for player message
       if (count < 2 && !state.winner && role !== "spectator") {
-        ctx.save();
         const t = Date.now() / 400;
         const pulse = 0.6 + 0.4 * Math.sin(t);
-        const scalePulse = 1 + 0.03 * Math.sin(t * 0.7);
         const waitSize = Math.max(16, Math.floor(H * 0.03));
 
-        // Animated dots: cycle 0-3 dots
         const dotCount = Math.floor((Date.now() / 500) % 4);
         const dots = ".".repeat(dotCount);
         const text = `WAITING FOR PLAYER${dots}`;
@@ -855,19 +803,13 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         ctx.font = `bold ${waitSize}px 'Inter', sans-serif`;
         ctx.textAlign = "center";
         ctx.fillStyle = "#ffffff";
-        ctx.shadowColor = "rgba(255, 255, 255, 0.6)";
-        ctx.shadowBlur = 10 + 8 * Math.sin(t);
         ctx.globalAlpha = pulse;
-        ctx.translate(W / 2, H - 60);
-        ctx.scale(scalePulse, scalePulse);
-        ctx.fillText(text, 0, 0);
+        ctx.fillText(text, W / 2, H - 60);
         ctx.globalAlpha = 1;
-        ctx.restore();
       }
 
       // Countdown overlay
       if (cd !== null) {
-        ctx.save();
         ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
         ctx.fillRect(0, 0, W, H);
 
@@ -875,15 +817,11 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         ctx.font = `bold ${cdSize}px 'Inter', sans-serif`;
         ctx.textAlign = "center";
         ctx.fillStyle = "#22d3ee";
-        ctx.shadowColor = "#22d3ee";
-        ctx.shadowBlur = 40;
         ctx.fillText(String(cd), W / 2, H / 2 + cdSize * 0.35);
-        ctx.restore();
       }
 
       // Winner overlay
       if (state.winner) {
-        ctx.save();
         ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
         ctx.fillRect(0, 0, W, H);
 
@@ -891,16 +829,12 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         ctx.font = `bold ${winSize}px 'Inter', sans-serif`;
         ctx.textAlign = "center";
         ctx.fillStyle = "#22d3ee";
-        ctx.shadowColor = "#22d3ee";
-        ctx.shadowBlur = 30;
         ctx.fillText(`${state.winner.toUpperCase()} WINS!`, W / 2, H / 2 - winSize * 0.3);
 
         const subSize = Math.max(14, Math.floor(H * 0.025));
         ctx.font = `${subSize}px 'Inter', sans-serif`;
         ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
-        ctx.shadowBlur = 0;
         ctx.fillText("New game starting soon...", W / 2, H / 2 + winSize * 0.8);
-        ctx.restore();
       }
 
       animId = requestAnimationFrame(draw);

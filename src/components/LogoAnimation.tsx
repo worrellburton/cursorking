@@ -109,8 +109,6 @@ export default function LogoAnimation({
       ctx.lineTo(16, 15);
       ctx.closePath();
       ctx.fillStyle = "#22d3ee";
-      ctx.shadowColor = "#22d3ee";
-      ctx.shadowBlur = 15;
       ctx.fill();
       ctx.strokeStyle = "rgba(0,0,0,0.5)";
       ctx.lineWidth = 0.8;
@@ -176,16 +174,13 @@ export default function LogoAnimation({
           }
 
           const alpha = p.life / p.maxLife;
-          ctx.save();
           ctx.globalAlpha = alpha;
           ctx.fillStyle = p.color;
-          ctx.shadowColor = p.color;
-          ctx.shadowBlur = 8;
           ctx.beginPath();
           ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
           ctx.fill();
-          ctx.restore();
         }
+        ctx.globalAlpha = 1;
 
         // Title fade overlay (radial reveal)
         if (elapsed >= titleFadeStart) {

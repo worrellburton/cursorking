@@ -158,6 +158,24 @@ export class PongRoom extends DurableObject {
     }
   }
 
+  pointCountdown() {
+    this.broadcastState();
+    this.broadcast(JSON.stringify({ type: "countdown", value: 3 }));
+    setTimeout(() => {
+      this.broadcast(JSON.stringify({ type: "countdown", value: 2 }));
+    }, 1000);
+    setTimeout(() => {
+      this.broadcast(JSON.stringify({ type: "countdown", value: 1 }));
+    }, 2000);
+    setTimeout(() => {
+      this.broadcast(JSON.stringify({ type: "countdown", value: 0 }));
+      if (this.players.size === 2 && !this.running) {
+        this.running = true;
+        this.interval = setInterval(() => this.tick(), 1000 / 60);
+      }
+    }, 3000);
+  }
+
   tick() {
     if (this.winner) return;
 
@@ -416,6 +434,9 @@ export class PongRoom extends DurableObject {
       }
       this.resetBall("right");
       this.broadcast(JSON.stringify({ type: "point-scored", scorer: "right" }));
+      this.stopGame();
+      this.pointCountdown();
+      return;
     }
     if (ball.x > 1) {
       this.state_.score.left++;
@@ -427,6 +448,9 @@ export class PongRoom extends DurableObject {
       }
       this.resetBall("left");
       this.broadcast(JSON.stringify({ type: "point-scored", scorer: "left" }));
+      this.stopGame();
+      this.pointCountdown();
+      return;
     }
 
     this.broadcastState();
