@@ -299,7 +299,7 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
     // Offset paddle above thumb so it's visible (shift up ~8% of screen)
     let serverX: number, serverY: number;
     if (isMobile) {
-      const offsetY = screenNY - 0.08;
+      const offsetY = screenNY - 0.14;
       const s = screenToServer(screenNX, Math.max(0, Math.min(1, offsetY)), role);
       serverX = s.x;
       serverY = s.y;
