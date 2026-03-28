@@ -96,6 +96,11 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
   const serverBallTimeRef = useRef(0);
   const serverBallDtRef = useRef(16.67);
   const interpBallRef = useRef({ x: 0.5, y: 0.5 });
+  const ballVelRef = useRef({ x: 0, y: 0 }); // velocity in units/ms for extrapolation
+
+  // Opponent paddle smoothing
+  const serverPaddleRef = useRef({ left: { x: 0.04, y: 0.5 }, right: { x: 0.96, y: 0.5 } });
+  const smoothPaddleRef = useRef({ left: { x: 0.04, y: 0.5 }, right: { x: 0.96, y: 0.5 } });
 
   const locationRef = useRef("");
 
@@ -201,15 +206,30 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
             setTimeout(() => playSfx("nextRound"), 2000);
           }
 
-          // Ball interpolation
+          // Ball interpolation — compute velocity for extrapolation
           const now = performance.now();
           const dt = now - serverBallTimeRef.current;
           if (dt > 0 && dt < 200) {
             serverBallDtRef.current = serverBallDtRef.current * 0.8 + dt * 0.2;
+            // Compute velocity from consecutive server positions
+            const prev = serverBallRef.current;
+            ballVelRef.current = {
+              x: (state.ball.x - prev.x) / dt,
+              y: (state.ball.y - prev.y) / dt,
+            };
           }
           serverBallPrevRef.current = { ...serverBallRef.current };
           serverBallRef.current = { x: state.ball.x, y: state.ball.y };
           serverBallTimeRef.current = now;
+
+          // Snap interpolated ball to server position on each update (smooth correction)
+          interpBallRef.current = { x: state.ball.x, y: state.ball.y };
+
+          // Store server paddle positions for opponent smoothing
+          serverPaddleRef.current = {
+            left: { ...state.paddles.left },
+            right: { ...state.paddles.right },
+          };
 
           // Client-side prediction: keep our own paddle position
           const role = myRoleRef.current;
@@ -447,24 +467,43 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         return { x: sx * W, y: sy * H };
       }
 
-      // Interpolate ball
+      // Extrapolate ball — predict position using velocity, never freeze
       const now = performance.now();
       const elapsed = now - serverBallTimeRef.current;
-      const t = Math.min(1, elapsed / serverBallDtRef.current);
-      const prevB = serverBallPrevRef.current;
-      const nextB = serverBallRef.current;
-      interpBallRef.current = {
-        x: prevB.x + (nextB.x - prevB.x) * t,
-        y: prevB.y + (nextB.y - prevB.y) * t,
-      };
+      if (!state.winner) {
+        const vel = ballVelRef.current;
+        let bx = serverBallRef.current.x + vel.x * elapsed;
+        let by = serverBallRef.current.y + vel.y * elapsed;
+        // Client-side wall bounce during extrapolation
+        if (by < 0) { by = -by; }
+        if (by > 1) { by = 2 - by; }
+        // Clamp to prevent wild extrapolation
+        bx = Math.max(-0.05, Math.min(1.05, bx));
+        interpBallRef.current = { x: bx, y: by };
+      }
 
       const activeBall = state.winner ? state.ball : interpBallRef.current;
       const ballScreen = toScreen(activeBall.x, activeBall.y);
       const ballX = ballScreen.x;
       const ballY = ballScreen.y;
 
-      const lpScreen = toScreen(state.paddles.left.x, state.paddles.left.y);
-      const rpScreen = toScreen(state.paddles.right.x, state.paddles.right.y);
+      // Smooth opponent paddle — lerp toward server position each frame
+      const oppSide: "left" | "right" = (myRoleRef.current === "left") ? "right" : "left";
+      const lerpFactor = 0.35; // blend speed per frame
+      const sp = serverPaddleRef.current;
+      const sm = smoothPaddleRef.current;
+      sm.left.x += (sp.left.x - sm.left.x) * lerpFactor;
+      sm.left.y += (sp.left.y - sm.left.y) * lerpFactor;
+      sm.right.x += (sp.right.x - sm.right.x) * lerpFactor;
+      sm.right.y += (sp.right.y - sm.right.y) * lerpFactor;
+
+      // Use smoothed positions for opponent, raw for own paddle
+      const displayPaddles = {
+        left: myRoleRef.current === "left" ? state.paddles.left : sm.left,
+        right: myRoleRef.current === "right" ? state.paddles.right : sm.right,
+      };
+      const lpScreen = toScreen(displayPaddles.left.x, displayPaddles.left.y);
+      const rpScreen = toScreen(displayPaddles.right.x, displayPaddles.right.y);
       const paddleLeftX = lpScreen.x;
       const paddleLeftY = lpScreen.y;
       const paddleRightX = rpScreen.x;
@@ -831,10 +870,9 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         ctx.restore();
       }
 
-      // Opponent cursor — draw at their paddle position
+      // Opponent cursor — draw at their smoothed paddle position
       if (!mob && (role === "left" || role === "right")) {
-        const oppSide = role === "left" ? "right" : "left";
-        const oppPaddle = state.paddles[oppSide];
+        const oppPaddle = displayPaddles[oppSide];
         const oppScreen = toScreen(oppPaddle.x, oppPaddle.y);
         const oppCursorColor = oppSide === "left" ? "#22d3ee" : "#f43f5e";
         const oppName = oppSide === "left" ? state.names.left : state.names.right;
