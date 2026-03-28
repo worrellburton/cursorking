@@ -72,7 +72,8 @@ export default function Home() {
         setLobbyPlayerCount(msg.count);
       }
       if (msg.type === "cursors") {
-        setLobbyCursors(msg.cursors);
+        // Filter out our own cursor so we don't see a duplicate
+        setLobbyCursors(msg.cursors.filter((c: LobbyCursor) => c.name !== playerName));
       }
     };
 
