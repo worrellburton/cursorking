@@ -929,17 +929,27 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
       if (count < 2 && !state.winner && role !== "spectator") {
         const t = Date.now() / 400;
         const pulse = 0.6 + 0.4 * Math.sin(t);
-        const waitSize = Math.max(16, Math.floor(H * 0.03));
 
         const dotCount = Math.floor((Date.now() / 500) % 4);
         const dots = ".".repeat(dotCount);
         const text = `WAITING FOR PLAYER${dots}`;
 
-        ctx.font = `bold ${waitSize}px 'Inter', sans-serif`;
-        ctx.textAlign = "center";
-        ctx.fillStyle = "#ffffff";
-        ctx.globalAlpha = pulse;
-        ctx.fillText(text, W / 2, H - 60);
+        if (mob) {
+          // Mobile: small text between center court and your score
+          const waitSize = Math.max(10, Math.floor(W * 0.025));
+          ctx.font = `bold ${waitSize}px 'Inter', sans-serif`;
+          ctx.textAlign = "center";
+          ctx.fillStyle = "rgba(255,255,255,0.6)";
+          ctx.globalAlpha = pulse;
+          ctx.fillText(text, W / 2, H * 0.7);
+        } else {
+          const waitSize = Math.max(16, Math.floor(H * 0.03));
+          ctx.font = `bold ${waitSize}px 'Inter', sans-serif`;
+          ctx.textAlign = "center";
+          ctx.fillStyle = "#ffffff";
+          ctx.globalAlpha = pulse;
+          ctx.fillText(text, W / 2, H - 60);
+        }
         ctx.globalAlpha = 1;
       }
 
