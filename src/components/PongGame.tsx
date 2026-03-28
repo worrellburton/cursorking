@@ -922,7 +922,11 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
       />
 
       <div
-        className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-full px-5 py-2"
+        className={`fixed z-50 flex items-center rounded-full ${
+          isMobile
+            ? "top-14 left-4 gap-1 px-2 py-0.5"
+            : "top-4 right-4 gap-2 px-5 py-2"
+        }`}
         style={{
           fontFamily: "'Inter', sans-serif",
           background: "rgba(0, 0, 0, 0.4)",
@@ -933,7 +937,7 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         }}
       >
         <span
-          className="inline-block h-2.5 w-2.5 rounded-full"
+          className={`inline-block rounded-full ${isMobile ? "h-1.5 w-1.5" : "h-2.5 w-2.5"}`}
           style={{
             background: "#22c55e",
             boxShadow: "0 0 8px #22c55e, 0 0 16px rgba(34, 197, 94, 0.5)",
@@ -941,7 +945,7 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
           }}
         />
         <span
-          className="text-sm font-bold"
+          className={`font-bold ${isMobile ? "text-[10px]" : "text-sm"}`}
           style={{
             color: "#22c55e",
             textShadow: "0 0 10px rgba(34, 197, 94, 0.8)",
@@ -949,8 +953,8 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         >
           {playerCount}
         </span>
-        <span className="text-xs text-gray-400">
-          GLOBAL PLAYERS
+        <span className={`text-gray-400 ${isMobile ? "text-[8px]" : "text-xs"}`}>
+          ONLINE
         </span>
       </div>
 
