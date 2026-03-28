@@ -224,11 +224,9 @@ export default function LogoAnimation({
         className="pointer-events-none fixed inset-0 z-30"
         style={{ width: "100vw", height: "100vh" }}
       />
-      {/* Title that fades in */}
-      <h1
-        className={`title-fire font-bold tracking-widest ${isMobile ? "text-5xl" : "text-7xl sm:text-9xl"}`}
+      {/* Logo that fades in with fire glow */}
+      <div
         style={{
-          fontFamily: "Inter, sans-serif",
           opacity: phase === "done" ? 1 : phase === "explode" ? 0.6 : 0,
           transform:
             phase === "done"
@@ -239,10 +237,19 @@ export default function LogoAnimation({
           transition: "opacity 0.6s ease-out, transform 0.6s ease-out",
           position: "relative",
           zIndex: 10,
+          filter: "drop-shadow(0 0 15px rgba(255, 160, 40, 0.8)) drop-shadow(0 0 40px rgba(255, 80, 10, 0.6)) drop-shadow(0 0 80px rgba(200, 30, 0, 0.4))",
+          animation: phase === "done" ? "logo-fire-glow 2s ease-in-out infinite" : "none",
         }}
       >
-        CURSOR<span className="title-fire-king">KING</span>
-      </h1>
+        <img
+          src={`${isMobile ? "" : ""}${process.env.NODE_ENV === "production" ? "/cursorking" : ""}/logo.svg`}
+          alt="CursorKing"
+          style={{
+            width: isMobile ? 280 : 500,
+            height: "auto",
+          }}
+        />
+      </div>
     </>
   );
 }

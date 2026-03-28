@@ -100,16 +100,23 @@ export default function Home() {
     };
   }, [screen, playerName]);
 
-  const handleNameSubmit = () => {
-    if (!playerName.trim()) return;
+  // Start music on first interaction with the name input
+  const startMusicIfNeeded = () => {
+    if (audioRef.current) return;
     const base = process.env.NODE_ENV === "production" ? "/cursorking" : "";
     const audio = new Audio(`${base}/music.mp3`);
     audio.volume = 0.5;
     audio.loop = true;
-    audio.load();
     audioRef.current = audio;
+    audio.play().catch(() => {});
+  };
+
+  const handleNameSubmit = () => {
+    if (!playerName.trim()) return;
+    startMusicIfNeeded();
 
     // Play CURSOR KING.mp3 on the start screen
+    const base = process.env.NODE_ENV === "production" ? "/cursorking" : "";
     const cursorKingAudio = new Audio(encodeURI(`${base}/CURSOR KING.mp3`));
     cursorKingAudio.volume = 0.6;
     cursorKingAudio.play().catch(() => {});
@@ -119,14 +126,7 @@ export default function Home() {
   };
 
   const handleStart = () => {
-    const base = process.env.NODE_ENV === "production" ? "/cursorking" : "";
-    if (!audioRef.current) {
-      const audio = new Audio(`${base}/music.mp3`);
-      audio.volume = 0.5;
-      audio.loop = true;
-      audioRef.current = audio;
-    }
-    audioRef.current.play().catch(() => {});
+    startMusicIfNeeded();
 
     // Close lobby WS early so the server frees any player slot before the game WS connects
     if (lobbyWsRef.current) {
@@ -304,7 +304,7 @@ export default function Home() {
               className="name-input"
               type="text"
               value={playerName}
-              onChange={(e) => setPlayerName(e.target.value.slice(0, 12))}
+              onChange={(e) => { startMusicIfNeeded(); setPlayerName(e.target.value.slice(0, 12)); }}
               onKeyDown={(e) => e.key === "Enter" && handleNameSubmit()}
               placeholder="PLAYER NAME"
               maxLength={12}
@@ -477,16 +477,18 @@ export default function Home() {
       {screen === "game" && (
         <>
           <div
-            className="fixed top-4 left-4 z-50 title-fire"
+            className="fixed top-4 left-4 z-50"
             style={{
-              fontFamily: "Inter, sans-serif",
-              fontSize: isMobile ? "0.9rem" : "1.25rem",
-              fontWeight: "bold",
-              letterSpacing: "0.15em",
               pointerEvents: "none",
+              filter: "drop-shadow(0 0 8px rgba(255, 160, 40, 0.6)) drop-shadow(0 0 20px rgba(255, 80, 10, 0.4))",
+              animation: "logo-fire-glow 2s ease-in-out infinite",
             }}
           >
-            CURSOR<span className="title-fire-king">KING</span>
+            <img
+              src={`${process.env.NODE_ENV === "production" ? "/cursorking" : ""}/logo.svg`}
+              alt="CursorKing"
+              style={{ width: isMobile ? 100 : 140, height: "auto" }}
+            />
           </div>
           <PongGame playerName={playerName} isMobile={isMobile} />
         </>
@@ -547,6 +549,14 @@ export default function Home() {
           font-family: Inter, sans-serif;
           font-weight: bold;
           letter-spacing: 0.15em;
+        }
+        @keyframes logo-fire-glow {
+          0%, 100% {
+            filter: drop-shadow(0 0 15px rgba(255, 160, 40, 0.8)) drop-shadow(0 0 40px rgba(255, 80, 10, 0.6)) drop-shadow(0 0 80px rgba(200, 30, 0, 0.4));
+          }
+          50% {
+            filter: drop-shadow(0 0 25px rgba(255, 200, 60, 1)) drop-shadow(0 0 60px rgba(255, 120, 20, 0.8)) drop-shadow(0 0 100px rgba(255, 40, 0, 0.5)) drop-shadow(0 0 140px rgba(200, 20, 0, 0.3));
+          }
         }
         @keyframes title-fire-anim {
           0%, 100% {
