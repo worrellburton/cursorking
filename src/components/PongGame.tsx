@@ -19,7 +19,7 @@ const WS_URL =
 type PaddleState = { x: number; y: number };
 
 type GameState = {
-  ball: { x: number; y: number };
+  ball: { x: number; y: number; vx?: number; vy?: number };
   ballSize: number;
   paddles: { left: PaddleState; right: PaddleState };
   score: { left: number; right: number };
@@ -206,24 +206,24 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
             setTimeout(() => playSfx("nextRound"), 2000);
           }
 
-          // Ball interpolation — compute velocity for extrapolation
+          // Ball interpolation — smooth correction with server-provided velocity
           const now = performance.now();
-          const dt = now - serverBallTimeRef.current;
-          if (dt > 0 && dt < 200) {
-            serverBallDtRef.current = serverBallDtRef.current * 0.8 + dt * 0.2;
-            // Compute velocity from consecutive server positions
-            const prev = serverBallRef.current;
-            ballVelRef.current = {
-              x: (state.ball.x - prev.x) / dt,
-              y: (state.ball.y - prev.y) / dt,
-            };
-          }
-          serverBallPrevRef.current = { ...serverBallRef.current };
-          serverBallRef.current = { x: state.ball.x, y: state.ball.y };
-          serverBallTimeRef.current = now;
 
-          // Snap interpolated ball to server position on each update (smooth correction)
-          interpBallRef.current = { x: state.ball.x, y: state.ball.y };
+          // Use exact velocity from server
+          const serverVx = state.ball.vx ?? 0;
+          const serverVy = state.ball.vy ?? 0;
+          ballVelRef.current = { x: serverVx / 16.67, y: serverVy / 16.67 };
+
+          // Smooth correction: blend current extrapolated position toward server
+          // instead of snapping (which causes micro-jumps)
+          const cur = interpBallRef.current;
+          const srv = state.ball;
+          const correctionBlend = 0.5; // how aggressively to correct (0=ignore server, 1=snap)
+          serverBallRef.current = {
+            x: cur.x + (srv.x - cur.x) * correctionBlend,
+            y: cur.y + (srv.y - cur.y) * correctionBlend,
+          };
+          serverBallTimeRef.current = now;
 
           // Store server paddle positions for opponent smoothing
           serverPaddleRef.current = {

@@ -509,7 +509,7 @@ export class PongRoom extends DurableObject {
       JSON.stringify({
         type: "game-state",
         state: {
-          ball: { x: this.state_.ball.x, y: this.state_.ball.y },
+          ball: { x: this.state_.ball.x, y: this.state_.ball.y, vx: this.state_.ball.vx, vy: this.state_.ball.vy },
           ballSize: Math.max(BALL_SIZE_MIN, BALL_SIZE_START - this.state_.rallyTicks * 0.00003),
           paddles: this.state_.paddles,
           score: this.state_.score,
@@ -573,7 +573,7 @@ export class PongRoom extends DurableObject {
       JSON.stringify({
         type: "game-state",
         state: {
-          ball: { x: this.state_.ball.x, y: this.state_.ball.y },
+          ball: { x: this.state_.ball.x, y: this.state_.ball.y, vx: this.state_.ball.vx, vy: this.state_.ball.vy },
           ballSize: Math.max(BALL_SIZE_MIN, BALL_SIZE_START - this.state_.rallyTicks * 0.00003),
           paddles: this.state_.paddles,
           score: this.state_.score,
