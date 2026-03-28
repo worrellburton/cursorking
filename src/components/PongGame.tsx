@@ -536,7 +536,7 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         ctx.fillRect(0, 0, W, H);
       }
 
-      // Center line
+      // Center line + center circle
       ctx.setLineDash([12, 12]);
       ctx.strokeStyle = "rgba(255,255,255,0.08)";
       ctx.lineWidth = 2;
@@ -550,6 +550,19 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
       }
       ctx.stroke();
       ctx.setLineDash([]);
+
+      // Center circle (like a hockey rink faceoff circle)
+      const centerR = Math.min(W, H) * 0.08;
+      ctx.strokeStyle = "rgba(255,255,255,0.06)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(mob ? W / 2 : W / 2, H / 2, centerR, 0, Math.PI * 2);
+      ctx.stroke();
+      // Small dot at center
+      ctx.fillStyle = "rgba(255,255,255,0.08)";
+      ctx.beginPath();
+      ctx.arc(mob ? W / 2 : W / 2, H / 2, 3, 0, Math.PI * 2);
+      ctx.fill();
 
       // Score & names
       ctx.textAlign = "center";
@@ -704,17 +717,17 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
       }
       ctx.globalAlpha = 1;
 
-      // Ball — one glow layer + core, no shadowBlur
+      // Ball — soft outer glow, less intense middle
       const ballGlowR = ballR * (2.5 + speedFactor);
-      ctx.globalAlpha = 0.4 + speedFactor * 0.1;
+      ctx.globalAlpha = 0.2 + speedFactor * 0.05;
       ctx.fillStyle = "#ff8020";
       ctx.beginPath();
       ctx.arc(ballX, ballY, ballGlowR, 0, Math.PI * 2);
       ctx.fill();
-      ctx.globalAlpha = 0.7;
+      ctx.globalAlpha = 0.35;
       ctx.fillStyle = "#ffcc66";
       ctx.beginPath();
-      ctx.arc(ballX, ballY, ballR * 1.8, 0, Math.PI * 2);
+      ctx.arc(ballX, ballY, ballR * 1.6, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 1;
       ctx.fillStyle = "#ffffff";
@@ -722,23 +735,30 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
       ctx.arc(ballX, ballY, ballR, 0, Math.PI * 2);
       ctx.fill();
 
-      // Bullets — simple circles, no gradients or shadowBlur
+      // Bullets — big yellow projectiles
       if (state.bullets) {
         for (const b of state.bullets) {
           const bs = toScreen(b.x, b.y);
           const bx = bs.x;
           const by = bs.y;
-          const bulletColor = b.owner === "left" ? "#22d3ee" : "#f43f5e";
 
-          ctx.globalAlpha = 0.3;
-          ctx.fillStyle = bulletColor;
+          // Outer glow
+          ctx.globalAlpha = 0.25;
+          ctx.fillStyle = "#ffdd33";
           ctx.beginPath();
-          ctx.arc(bx, by, 10, 0, Math.PI * 2);
+          ctx.arc(bx, by, 18, 0, Math.PI * 2);
           ctx.fill();
+          // Inner glow
+          ctx.globalAlpha = 0.5;
+          ctx.fillStyle = "#ffee66";
+          ctx.beginPath();
+          ctx.arc(bx, by, 12, 0, Math.PI * 2);
+          ctx.fill();
+          // Core
           ctx.globalAlpha = 1;
           ctx.fillStyle = "#ffffff";
           ctx.beginPath();
-          ctx.arc(bx, by, 3, 0, Math.PI * 2);
+          ctx.arc(bx, by, 6, 0, Math.PI * 2);
           ctx.fill();
         }
       }

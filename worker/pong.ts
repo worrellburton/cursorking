@@ -65,14 +65,12 @@ export class PongRoom extends DurableObject {
   }
 
   freshState(): GameState {
-    const angle = (Math.random() * Math.PI) / 4 - Math.PI / 8;
-    const dir = Math.random() > 0.5 ? 1 : -1;
     return {
       ball: {
         x: 0.5,
         y: 0.5,
-        vx: BALL_SPEED * dir * Math.cos(angle),
-        vy: BALL_SPEED * Math.sin(angle),
+        vx: 0,
+        vy: 0,
       },
       paddles: {
         left: { x: 0.04, y: 0.5 },
@@ -83,14 +81,13 @@ export class PongRoom extends DurableObject {
     };
   }
 
-  resetBall(scoredSide: "left" | "right") {
-    const angle = (Math.random() * Math.PI) / 4 - Math.PI / 8;
-    const dir = scoredSide === "left" ? -1 : 1;
+  resetBall(_scoredSide: "left" | "right") {
+    // Ball starts stationary at center — only moves when a paddle hits it
     this.state_.ball = {
       x: 0.5,
       y: 0.5,
-      vx: BALL_SPEED * dir * Math.cos(angle),
-      vy: BALL_SPEED * Math.sin(angle),
+      vx: 0,
+      vy: 0,
     };
     this.state_.rallyTicks = 0;
   }
@@ -397,7 +394,8 @@ export class PongRoom extends DurableObject {
 
     // Spawn pickup if timer elapsed
     if (!this.pickup.active && now >= this.nextPickupTime) {
-      this.pickup = { x: 0.5, y: 0.2 + Math.random() * 0.6, active: true };
+      // Spawn pickup at center circle
+      this.pickup = { x: 0.5, y: 0.5, active: true };
     }
 
     // Update bullets
