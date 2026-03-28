@@ -282,9 +282,9 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
     const clampedY = Math.max(PADDLE_H_NORM / 2, Math.min(1 - PADDLE_H_NORM / 2, serverY));
     gameStateRef.current.paddles[role] = { x: clampedX, y: clampedY };
 
-    // Throttle network sends to ~60fps
+    // Throttle network sends to ~120fps
     const now = Date.now();
-    if (now - lastSentRef.current < 16) return;
+    if (now - lastSentRef.current < 8) return;
     lastSentRef.current = now;
 
     wsRef.current?.send(JSON.stringify({ type: "paddle-move", x: serverX, y: serverY }));

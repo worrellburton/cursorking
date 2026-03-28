@@ -63,10 +63,14 @@ export default function SpaceBackground() {
 
     let animId: number;
     let time = 0;
+    let lastFrame = performance.now();
 
     function draw() {
       if (!ctx || !canvas) return;
-      time += 0.016;
+      const now = performance.now();
+      const dt = Math.min(0.05, (now - lastFrame) / 1000); // cap at 50ms to avoid jumps
+      lastFrame = now;
+      time += dt;
       const W = canvas.width;
       const H = canvas.height;
 
