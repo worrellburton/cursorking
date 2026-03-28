@@ -110,7 +110,7 @@ export default function Home() {
     audioRef.current = audio;
 
     // Play CURSOR KING.mp3 on the start screen
-    const cursorKingAudio = new Audio(`${base}/CURSOR KING.mp3`);
+    const cursorKingAudio = new Audio(encodeURI(`${base}/CURSOR KING.mp3`));
     cursorKingAudio.volume = 0.6;
     cursorKingAudio.play().catch(() => {});
 

@@ -86,6 +86,7 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
   // Sound effects refs
   const sfxRef = useRef<Record<string, HTMLAudioElement>>({});
   const sfxLoadedRef = useRef(false);
+  const audioUnlockedRef = useRef(false);
 
   // Only playerCount triggers React re-render (for the HUD text)
   const [playerCount, setPlayerCount] = useState(0);
@@ -97,22 +98,45 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
       countdown3: `${base}/3.mp3`,
       countdown2: `${base}/2.mp3`,
       countdown1: `${base}/1.mp3`,
-      go: `${base}/GO!.mp3`,
-      roundStart: `${base}/ROUND START.mp3`,
-      nextRound: `${base}/Next Round.mp3`,
-      youWin: `${base}/YOU WIN.mp3`,
-      youLost: `${base}/You Lost.mp3`,
+      go: encodeURI(`${base}/GO!.mp3`),
+      roundStart: encodeURI(`${base}/ROUND START.mp3`),
+      nextRound: encodeURI(`${base}/Next Round.mp3`),
+      youWin: encodeURI(`${base}/YOU WIN.mp3`),
+      youLost: encodeURI(`${base}/You Lost.mp3`),
       hit: `${base}/hit.mp3`,
     };
     const loaded: Record<string, HTMLAudioElement> = {};
     for (const [key, src] of Object.entries(sounds)) {
       const a = new Audio(src);
       a.volume = 0.7;
+      a.preload = "auto";
       a.load();
       loaded[key] = a;
     }
     sfxRef.current = loaded;
     sfxLoadedRef.current = true;
+
+    // Unlock audio on first user interaction (required by browsers)
+    const unlock = () => {
+      if (audioUnlockedRef.current) return;
+      audioUnlockedRef.current = true;
+      // Play and immediately pause a silent sound to unlock the audio context
+      for (const a of Object.values(loaded)) {
+        a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(() => {});
+      }
+      window.removeEventListener("click", unlock);
+      window.removeEventListener("touchstart", unlock);
+      window.removeEventListener("pointerdown", unlock);
+    };
+    window.addEventListener("click", unlock);
+    window.addEventListener("touchstart", unlock);
+    window.addEventListener("pointerdown", unlock);
+
+    return () => {
+      window.removeEventListener("click", unlock);
+      window.removeEventListener("touchstart", unlock);
+      window.removeEventListener("pointerdown", unlock);
+    };
   }, []);
 
   const playSfx = useCallback((name: string) => {
@@ -198,6 +222,9 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
           playSfx("roundStart");
         }
         if (msg.type === "paddle-hit") {
+          playSfx("hit");
+        }
+        if (msg.type === "wall-hit") {
           playSfx("hit");
         }
         if (msg.type === "bullet-hit") {

@@ -181,10 +181,12 @@ export class PongRoom extends DurableObject {
     if (ball.y - BALL_SIZE <= 0) {
       ball.y = BALL_SIZE;
       ball.vy = Math.abs(ball.vy);
+      this.broadcast(JSON.stringify({ type: "wall-hit" }));
     }
     if (ball.y + BALL_SIZE >= 1) {
       ball.y = 1 - BALL_SIZE;
       ball.vy = -Math.abs(ball.vy);
+      this.broadcast(JSON.stringify({ type: "wall-hit" }));
     }
 
     // Swept collision helper: check if ball crossed paddle during this tick
