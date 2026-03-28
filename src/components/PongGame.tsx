@@ -1003,7 +1003,7 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
       <div
         className={`fixed z-50 flex items-center rounded-full ${
           isMobile
-            ? "top-14 left-4 gap-1 px-2 py-0.5"
+            ? "top-4 right-4 gap-1 px-2 py-0.5"
             : "top-4 right-4 gap-2 px-5 py-2"
         }`}
         style={{

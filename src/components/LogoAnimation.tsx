@@ -49,9 +49,16 @@ export default function LogoAnimation({
     const startTime = performance.now();
     const cursorStart = { x: -40, y: H * 0.35 };
     const cursorEnd = { x: W / 2, y: H / 2 - (isMobile ? 20 : 40) };
-    const cursorDuration = 1200; // ms to move cursor in
-    const clickTime = cursorDuration + 200; // cursor arrives, brief pause, then click
-    const explodeTime = clickTime + 150; // explosion starts
+    // On mobile, skip everything — logo appears immediately
+    if (isMobile) {
+      setPhase("done");
+      onLogoAppear?.();
+      setTimeout(() => onComplete(), 100);
+      return () => {};
+    }
+    const cursorDuration = 1200;
+    const clickTime = cursorDuration + 200;
+    const explodeTime = clickTime + 150;
     const titleFadeStart = explodeTime + 300;
     const doneTime = explodeTime + 1800;
 
