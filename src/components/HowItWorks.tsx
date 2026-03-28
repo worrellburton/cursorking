@@ -19,7 +19,7 @@ export default function HowItWorks({ onContinue, isMobile }: { onContinue: () =>
     return () => clearInterval(interval);
   }, [step]);
 
-  const totalSteps = 5;
+  const totalSteps = 4;
 
   const next = () => {
     if (step < totalSteps - 1) setStep(step + 1);
@@ -52,8 +52,8 @@ export default function HowItWorks({ onContinue, isMobile }: { onContinue: () =>
         maxWidth: 600,
       }}
     >
-      {/* Step 0: Entry fee breakdown */}
-      {step === 0 && (
+      {/* Step 1: Entry fee breakdown */}
+      {step === 1 && (
         <div className="hiw-step flex flex-col items-center gap-6 text-center">
           <h2
             style={{
@@ -145,8 +145,8 @@ export default function HowItWorks({ onContinue, isMobile }: { onContinue: () =>
         </div>
       )}
 
-      {/* Step 1: Tournament bracket */}
-      {step === 1 && (
+      {/* Step 0: Tournament bracket */}
+      {step === 0 && (
         <div className="hiw-step flex flex-col items-center gap-6 text-center">
           <h2
             style={{
@@ -315,95 +315,6 @@ export default function HowItWorks({ onContinue, isMobile }: { onContinue: () =>
           <p style={{ fontFamily: "Inter, sans-serif", fontSize: subSize, color: "rgba(255,255,255,0.5)", maxWidth: 340, lineHeight: 1.5 }}>
             Your payout is proportional to your time as King.
             Reign longer = earn more from the daily cup.
-          </p>
-        </div>
-      )}
-
-      {/* Step 4: Example payout — 1,000,000 players */}
-      {step === 4 && (
-        <div className="hiw-step flex flex-col items-center gap-6 text-center">
-          <h2
-            style={{
-              fontFamily: "Inter, sans-serif",
-              fontSize: headingSize,
-              fontWeight: "bold",
-              letterSpacing: "0.05em",
-              color: "#22d3ee",
-              textShadow: "0 0 15px rgba(34,211,238,0.6)",
-            }}
-          >
-            EXAMPLE PAYOUTS
-          </h2>
-
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: subSize, color: "rgba(255,255,255,0.5)", maxWidth: 360 }}>
-            If <span style={{ color: "#22d3ee", fontWeight: "bold" }}>1,000,000 players</span> enter today at $1 each:
-          </p>
-
-          {/* Breakdown table */}
-          <div style={{ width: isMobile ? 300 : 380, fontFamily: "Inter, sans-serif", fontSize: subSize }}>
-            {/* Total pool */}
-            <div className="hiw-bar-row" style={{ animationDelay: "0.1s", padding: "10px 16px", background: "rgba(255,255,255,0.05)", borderRadius: 8, marginBottom: 8 }}>
-              <span style={{ color: "rgba(255,255,255,0.6)", flex: 1 }}>Total Entry Pool</span>
-              <span style={{ color: "#fff", fontWeight: "bold", fontSize: "1.1rem" }}>$1,000,000</span>
-            </div>
-
-            {/* Split */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
-              <div className="hiw-bar-row" style={{ animationDelay: "0.3s", padding: "8px 16px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
-                  <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 2, background: "#22d3ee" }} />
-                  <span style={{ color: "rgba(255,255,255,0.6)" }}>Win/Lose Pool (70%)</span>
-                </div>
-                <span style={{ color: "#22d3ee", fontWeight: "bold" }}>$700,000</span>
-              </div>
-
-              <div className="hiw-bar-row" style={{ animationDelay: "0.5s", padding: "8px 16px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
-                  <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 2, background: "#fbbf24" }} />
-                  <span style={{ color: "rgba(255,255,255,0.6)" }}>King&apos;s Cup (15%)</span>
-                </div>
-                <span style={{ color: "#fbbf24", fontWeight: "bold" }}>$150,000</span>
-              </div>
-
-              <div className="hiw-bar-row" style={{ animationDelay: "0.7s", padding: "8px 16px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
-                  <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 2, background: "#f43f5e" }} />
-                  <span style={{ color: "rgba(255,255,255,0.6)" }}>CursorKing Team (15%)</span>
-                </div>
-                <span style={{ color: "#f43f5e", fontWeight: "bold" }}>$150,000</span>
-              </div>
-            </div>
-
-            {/* Divider */}
-            <div style={{ height: 1, background: "rgba(255,255,255,0.1)", margin: "12px 0" }} />
-
-            {/* Winner payouts */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <div className="hiw-bar-row" style={{ animationDelay: "0.9s", padding: "8px 16px" }}>
-                <span style={{ color: "rgba(255,255,255,0.5)", flex: 1 }}>Each match winner earns</span>
-                <span style={{ color: "#22d3ee", fontWeight: "bold" }}>~$1.40</span>
-              </div>
-              <div className="hiw-bar-row" style={{ animationDelay: "1.1s", padding: "8px 16px" }}>
-                <span style={{ color: "rgba(255,255,255,0.5)", flex: 1 }}>Each match loser loses</span>
-                <span style={{ color: "#f43f5e", fontWeight: "bold" }}>$1.00</span>
-              </div>
-            </div>
-
-            {/* Divider */}
-            <div style={{ height: 1, background: "rgba(255,255,255,0.1)", margin: "12px 0" }} />
-
-            {/* King's Cup example */}
-            <div className="hiw-bar-row" style={{ animationDelay: "1.3s", padding: "10px 16px", background: "rgba(251,191,36,0.08)", borderRadius: 8 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ color: "#fbbf24", fontWeight: "bold" }}>&#x1F451; Daily King&apos;s Cup</div>
-                <div style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.7rem", marginTop: 2 }}>Split by time as King</div>
-              </div>
-              <span style={{ color: "#fbbf24", fontWeight: "bold", fontSize: "1.2rem" }}>$150,000</span>
-            </div>
-          </div>
-
-          <p style={{ fontFamily: "Inter, sans-serif", fontSize: "0.7rem", color: "rgba(255,255,255,0.3)", maxWidth: 300, lineHeight: 1.4, marginTop: 4 }}>
-            Numbers scale with players. More entries = bigger pools.
           </p>
         </div>
       )}
