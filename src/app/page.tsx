@@ -114,16 +114,16 @@ export default function Home() {
   const handleNameSubmit = () => {
     if (!playerName.trim()) return;
     startMusicIfNeeded();
+    setLogoAnimDone(false);
+    setScreen("start");
+  };
 
-    // Play CURSOR KING.mp3 on the start screen
+  const handleLogoAppear = useCallback(() => {
     const base = process.env.NODE_ENV === "production" ? "/cursorking" : "";
     const cursorKingAudio = new Audio(encodeURI(`${base}/CURSOR KING.mp3`));
     cursorKingAudio.volume = 0.6;
     cursorKingAudio.play().catch(() => {});
-
-    setLogoAnimDone(false);
-    setScreen("start");
-  };
+  }, []);
 
   const handleStart = () => {
     startMusicIfNeeded();
@@ -357,7 +357,7 @@ export default function Home() {
         <>
           <div className="relative z-10 flex flex-col items-center gap-6 text-center px-4">
             {/* Animated logo: cursor flies in, clicks, explodes, title appears */}
-            <LogoAnimation isMobile={isMobile} onComplete={handleLogoComplete} />
+            <LogoAnimation isMobile={isMobile} onComplete={handleLogoComplete} onLogoAppear={handleLogoAppear} />
 
             {/* Buttons fade in after logo animation */}
             <div

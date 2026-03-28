@@ -16,9 +16,11 @@ type Particle = {
 export default function LogoAnimation({
   isMobile,
   onComplete,
+  onLogoAppear,
 }: {
   isMobile: boolean;
   onComplete: () => void;
+  onLogoAppear?: () => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [phase, setPhase] = useState<"cursor" | "explode" | "done">("cursor");
@@ -147,6 +149,7 @@ export default function LogoAnimation({
           exploded = true;
           spawnExplosion(cursorEnd.x, cursorEnd.y);
           setPhase("explode");
+          onLogoAppear?.();
         }
 
         // Draw cursor fading out after explosion
