@@ -50,6 +50,7 @@ export class PongRoom extends DurableObject {
   pickup: { x: number; y: number; active: boolean } = { x: 0.5, y: 0.5, active: false };
   slowedUntil: { left: number; right: number } = { left: 0, right: 0 };
   nextPickupTime = 0;
+  countdownId = 0;
   cursorPositions: { left: { x: number; y: number }; right: { x: number; y: number } } = {
     left: { x: 0.04, y: 0.5 },
     right: { x: 0.96, y: 0.5 },
@@ -140,16 +141,22 @@ export class PongRoom extends DurableObject {
     this.nextPickupTime = Date.now() + PICKUP_SPAWN_INTERVAL;
     this.broadcastState();
 
+    this.countdownId++;
+    const id = this.countdownId;
     this.broadcast(JSON.stringify({ type: "countdown", value: 3 }));
     setTimeout(() => {
+      if (this.countdownId !== id) return;
       this.broadcast(JSON.stringify({ type: "countdown", value: 2 }));
     }, 1000);
     setTimeout(() => {
+      if (this.countdownId !== id) return;
       this.broadcast(JSON.stringify({ type: "countdown", value: 1 }));
     }, 2000);
     setTimeout(() => {
+      if (this.countdownId !== id) return;
       this.broadcast(JSON.stringify({ type: "countdown", value: 0 }));
       this.launchBall();
+      this.broadcastState();
       this.running = true;
       this.interval = setInterval(() => this.tick(), 1000 / 60);
     }, 3000);
@@ -164,18 +171,24 @@ export class PongRoom extends DurableObject {
   }
 
   pointCountdown() {
+    this.countdownId++;
+    const id = this.countdownId;
     this.broadcastState();
     this.broadcast(JSON.stringify({ type: "countdown", value: 3 }));
     setTimeout(() => {
+      if (this.countdownId !== id) return;
       this.broadcast(JSON.stringify({ type: "countdown", value: 2 }));
     }, 1000);
     setTimeout(() => {
+      if (this.countdownId !== id) return;
       this.broadcast(JSON.stringify({ type: "countdown", value: 1 }));
     }, 2000);
     setTimeout(() => {
+      if (this.countdownId !== id) return;
       this.broadcast(JSON.stringify({ type: "countdown", value: 0 }));
       if (this.players.size === 2 && !this.running) {
         this.launchBall();
+        this.broadcastState();
         this.running = true;
         this.interval = setInterval(() => this.tick(), 1000 / 60);
       }
