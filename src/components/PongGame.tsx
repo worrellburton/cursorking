@@ -717,19 +717,7 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
       }
       ctx.globalAlpha = 1;
 
-      // Ball — soft outer glow, less intense middle
-      const ballGlowR = ballR * (2.5 + speedFactor);
-      ctx.globalAlpha = 0.2 + speedFactor * 0.05;
-      ctx.fillStyle = "#ff8020";
-      ctx.beginPath();
-      ctx.arc(ballX, ballY, ballGlowR, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 0.35;
-      ctx.fillStyle = "#ffcc66";
-      ctx.beginPath();
-      ctx.arc(ballX, ballY, ballR * 1.6, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
+      // Ball — clean white, no glow
       ctx.fillStyle = "#ffffff";
       ctx.beginPath();
       ctx.arc(ballX, ballY, ballR, 0, Math.PI * 2);
