@@ -119,6 +119,7 @@ export default function Home() {
   };
 
   const handleLogoAppear = useCallback(() => {
+    startMusicIfNeeded();
     const base = process.env.NODE_ENV === "production" ? "/cursorking" : "";
     const cursorKingAudio = new Audio(encodeURI(`${base}/CURSOR KING.mp3`));
     cursorKingAudio.volume = 0.6;
