@@ -82,7 +82,7 @@ export class PongRoom extends DurableObject {
   }
 
   resetBall(_scoredSide: "left" | "right") {
-    // Ball starts stationary at center — only moves when a paddle hits it
+    // Ball starts stationary at center — launched after countdown
     this.state_.ball = {
       x: 0.5,
       y: 0.5,
@@ -90,6 +90,13 @@ export class PongRoom extends DurableObject {
       vy: 0,
     };
     this.state_.rallyTicks = 0;
+  }
+
+  launchBall() {
+    const angle = (Math.random() * Math.PI) / 4 - Math.PI / 8;
+    const dir = Math.random() > 0.5 ? 1 : -1;
+    this.state_.ball.vx = BALL_SPEED * dir * Math.cos(angle);
+    this.state_.ball.vy = BALL_SPEED * Math.sin(angle);
   }
 
   getNameForRole(role: "left" | "right"): string {
@@ -142,6 +149,7 @@ export class PongRoom extends DurableObject {
     }, 2000);
     setTimeout(() => {
       this.broadcast(JSON.stringify({ type: "countdown", value: 0 }));
+      this.launchBall();
       this.running = true;
       this.interval = setInterval(() => this.tick(), 1000 / 60);
     }, 3000);
@@ -167,6 +175,7 @@ export class PongRoom extends DurableObject {
     setTimeout(() => {
       this.broadcast(JSON.stringify({ type: "countdown", value: 0 }));
       if (this.players.size === 2 && !this.running) {
+        this.launchBall();
         this.running = true;
         this.interval = setInterval(() => this.tick(), 1000 / 60);
       }
