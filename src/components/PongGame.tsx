@@ -45,6 +45,22 @@ function screenToServer(screenX: number, screenY: number, role: "left" | "right"
   return { x: screenY, y: 1 - screenX };
 }
 
+// Convert 2-letter country code to flag emoji
+function countryFlag(code: string): string {
+  if (!code || code.length !== 2) return "";
+  const upper = code.toUpperCase();
+  return String.fromCodePoint(
+    0x1f1e6 + upper.charCodeAt(0) - 65,
+    0x1f1e6 + upper.charCodeAt(1) - 65
+  );
+}
+
+// Extract country code from location string like "New York, US"
+function extractCountryCode(loc: string): string {
+  const parts = loc.split(",");
+  return (parts[parts.length - 1] || "").trim();
+}
+
 export default function PongGame({ playerName, isMobile = false }: { playerName: string; isMobile?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -498,13 +514,44 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
 
       // Score & names
       ctx.textAlign = "center";
+      // Helper: draw location tag with flag + pill background
+      function drawLocationTag(c: CanvasRenderingContext2D, cx: number, cy: number, loc: string, color: string, fontSize: number) {
+        const cc = extractCountryCode(loc);
+        const flag = countryFlag(cc);
+        const label = flag ? `${flag}  ${loc.toUpperCase()}` : loc.toUpperCase();
+
+        c.font = `bold ${fontSize}px 'Inter', sans-serif`;
+        const textW = c.measureText(label).width;
+        const padX = fontSize * 0.6;
+        const padY = fontSize * 0.35;
+        const tagW = textW + padX * 2;
+        const tagH = fontSize + padY * 2;
+
+        // Pill background
+        c.fillStyle = "rgba(0, 0, 0, 0.35)";
+        c.beginPath();
+        c.roundRect(cx - tagW / 2, cy - tagH / 2, tagW, tagH, tagH / 2);
+        c.fill();
+
+        // Border
+        c.strokeStyle = color;
+        c.lineWidth = 1;
+        c.beginPath();
+        c.roundRect(cx - tagW / 2, cy - tagH / 2, tagW, tagH, tagH / 2);
+        c.stroke();
+
+        // Text
+        c.fillStyle = color;
+        c.textAlign = "center";
+        c.fillText(label, cx, cy + fontSize * 0.35);
+      }
+
       if (mob) {
         // Mobile: my score at bottom, opponent at top
         const myScore = role === "left" ? state.score.left : state.score.right;
         const oppScore = role === "left" ? state.score.right : state.score.left;
         const myName = role === "left" ? state.names.left : state.names.right;
         const oppName = role === "left" ? state.names.right : state.names.left;
-        const myLoc = role === "left" ? state.locations?.left : state.locations?.right;
         const oppLoc = role === "left" ? state.locations?.right : state.locations?.left;
 
         const scoreSize = Math.floor(W * 0.12);
@@ -519,12 +566,11 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
           ctx.fillStyle = `${oppColor}99`;
           ctx.fillText(oppName.toUpperCase(), W / 2, H * 0.04);
           if (oppLoc) {
-            ctx.font = `${Math.max(9, nameSize - 3)}px 'Inter', sans-serif`;
-            ctx.fillStyle = `${oppColor}55`;
-            ctx.fillText(oppLoc.toUpperCase(), W / 2, H * 0.04 + nameSize);
+            drawLocationTag(ctx, W / 2, H * 0.04 + nameSize + 4, oppLoc, `${oppColor}66`, Math.max(8, nameSize - 4));
           }
         }
         ctx.font = `bold ${nameSize}px 'Inter', sans-serif`;
+        ctx.textAlign = "center";
         if (myName) {
           ctx.fillStyle = `${myColor}99`;
           ctx.fillText(myName.toUpperCase(), W / 2, H * 0.97);
@@ -543,27 +589,22 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
           ctx.fillText(state.names.left.toUpperCase(), W / 4, H * 0.05);
           if (state.locations?.left) {
             const locSize = Math.max(10, Math.floor(H * 0.016));
-            ctx.font = `${locSize}px 'Inter', sans-serif`;
-            ctx.fillStyle = "rgba(34, 211, 238, 0.3)";
-            ctx.fillText(state.locations.left.toUpperCase(), W / 4, H * 0.05 + nameSize * 0.9);
-            ctx.font = `bold ${nameSize}px 'Inter', sans-serif`;
+            drawLocationTag(ctx, W / 4, H * 0.05 + nameSize * 0.6, state.locations.left, "rgba(34, 211, 238, 0.4)", locSize);
           }
         }
         if (state.names.right) {
+          ctx.font = `bold ${nameSize}px 'Inter', sans-serif`;
           ctx.fillStyle = "rgba(244, 63, 94, 0.6)";
           ctx.fillText(state.names.right.toUpperCase(), (W * 3) / 4, H * 0.05);
           if (state.locations?.right) {
             const locSize = Math.max(10, Math.floor(H * 0.016));
-            ctx.font = `${locSize}px 'Inter', sans-serif`;
-            ctx.fillStyle = "rgba(244, 63, 94, 0.3)";
-            ctx.fillText(state.locations.right.toUpperCase(), (W * 3) / 4, H * 0.05 + nameSize * 0.9);
-            ctx.font = `bold ${nameSize}px 'Inter', sans-serif`;
+            drawLocationTag(ctx, (W * 3) / 4, H * 0.05 + nameSize * 0.6, state.locations.right, "rgba(244, 63, 94, 0.4)", locSize);
           }
         }
       }
 
-      // Left paddle
-      const leftPaddleColor = state.slowed?.left ? "#ff4444" : "#22d3ee";
+      // Left paddle — own paddle is white, opponent is team color
+      const leftPaddleColor = state.slowed?.left ? "#ff4444" : role === "left" ? "#ffffff" : "#22d3ee";
       const lx = paddleLeftX - paddleW / 2;
       const ly = paddleLeftY - paddleH / 2;
       ctx.globalAlpha = 0.25;
@@ -578,7 +619,7 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
       ctx.fill();
 
       // Right paddle
-      const rightPaddleColor = state.slowed?.right ? "#ff4444" : "#f43f5e";
+      const rightPaddleColor = state.slowed?.right ? "#ff4444" : role === "right" ? "#ffffff" : "#f43f5e";
       const rx = paddleRightX - paddleW / 2;
       const ry = paddleRightY - paddleH / 2;
       ctx.globalAlpha = 0.25;
@@ -786,6 +827,42 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
           const nameColor = role === "left" ? "#22d3ee" : "#f43f5e";
           ctx.fillStyle = nameColor;
           ctx.fillText(myName.toUpperCase(), 18, 28);
+        }
+        ctx.restore();
+      }
+
+      // Opponent cursor — draw at their paddle position
+      if (!mob && (role === "left" || role === "right")) {
+        const oppSide = role === "left" ? "right" : "left";
+        const oppPaddle = state.paddles[oppSide];
+        const oppScreen = toScreen(oppPaddle.x, oppPaddle.y);
+        const oppCursorColor = oppSide === "left" ? "#22d3ee" : "#f43f5e";
+        const oppName = oppSide === "left" ? state.names.left : state.names.right;
+
+        ctx.save();
+        ctx.globalAlpha = 0.5;
+        ctx.translate(oppScreen.x, oppScreen.y);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(0, 18);
+        ctx.lineTo(5, 14);
+        ctx.lineTo(8, 20);
+        ctx.lineTo(11, 19);
+        ctx.lineTo(8, 13);
+        ctx.lineTo(13, 12);
+        ctx.closePath();
+        ctx.fillStyle = oppCursorColor;
+        ctx.fill();
+        ctx.strokeStyle = "rgba(0,0,0,0.4)";
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+
+        if (oppName) {
+          const labelSize = Math.max(10, Math.floor(H * 0.015));
+          ctx.font = `bold ${labelSize}px 'Inter', sans-serif`;
+          ctx.textAlign = "left";
+          ctx.fillStyle = oppCursorColor;
+          ctx.fillText(oppName.toUpperCase(), 16, 24);
         }
         ctx.restore();
       }
