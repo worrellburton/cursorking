@@ -61,7 +61,7 @@ function extractCountryCode(loc: string): string {
   return (parts[parts.length - 1] || "").trim();
 }
 
-export default function PongGame({ playerName, isMobile = false }: { playerName: string; isMobile?: boolean }) {
+export default function PongGame({ playerName, isMobile = false, aiMode = false }: { playerName: string; isMobile?: boolean; aiMode?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -181,7 +181,8 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
 
   useEffect(() => {
     function connect() {
-      const ws = new WebSocket(WS_URL);
+      const wsUrl = aiMode ? `${WS_URL}${WS_URL.includes("?") ? "&" : "?"}mode=ai` : WS_URL;
+      const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
         wsRef.current = ws;
@@ -284,7 +285,7 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
     return () => {
       wsRef.current?.close();
     };
-  }, [playerName]);
+  }, [playerName, aiMode]);
 
   const sendPaddleFromScreen = useCallback((clientX: number, clientY: number) => {
     const role = myRoleRef.current;

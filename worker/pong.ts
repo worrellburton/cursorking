@@ -59,6 +59,8 @@ export class PongRoom extends DurableObject {
     left: { x: 0.04, y: 0.5 },
     right: { x: 0.96, y: 0.5 },
   };
+  aiMode = false;
+  aiTarget = { x: 0.96, y: 0.5 };
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -101,6 +103,7 @@ export class PongRoom extends DurableObject {
   }
 
   getNameForRole(role: "left" | "right"): string {
+    if (this.aiMode && role === "right") return "CPU";
     for (const [ws, r] of this.players) {
       if (r === role) return this.names.get(ws) ?? "";
     }
@@ -108,6 +111,7 @@ export class PongRoom extends DurableObject {
   }
 
   getLocationForRole(role: "left" | "right"): string {
+    if (this.aiMode && role === "right") return "";
     for (const [ws, r] of this.players) {
       if (r === role) return this.locations.get(ws) ?? "";
     }
@@ -186,7 +190,8 @@ export class PongRoom extends DurableObject {
     setTimeout(() => {
       if (this.countdownId !== id) return;
       this.broadcast(JSON.stringify({ type: "countdown", value: 0 }));
-      if (this.players.size === 2 && !this.running) {
+      const need = this.aiMode ? 1 : 2;
+      if (this.players.size >= need && !this.running) {
         this.launchBall();
         this.broadcastState();
         this.running = true;
@@ -473,7 +478,83 @@ export class PongRoom extends DurableObject {
       return;
     }
 
+    // AI paddle control
+    if (this.aiMode) {
+      this.tickAI();
+    }
+
     this.broadcastState();
+  }
+
+  tickAI() {
+    const ball = this.state_.ball;
+    const rp = this.state_.paddles.right;
+    const now = Date.now();
+    const isSlowed = this.slowedUntil.right > now;
+
+    // Predict where ball will be when it reaches the AI's x position
+    let targetY = ball.y;
+    if (ball.vx > 0) {
+      // Ball coming toward AI — predict intercept
+      const dx = rp.x - ball.x;
+      const ticksToArrive = dx / ball.vx;
+      targetY = ball.y + ball.vy * ticksToArrive;
+      // Simulate bounces
+      while (targetY < 0 || targetY > 1) {
+        if (targetY < 0) targetY = -targetY;
+        if (targetY > 1) targetY = 2 - targetY;
+      }
+    } else {
+      // Ball going away — return to center with slight offset
+      targetY = 0.5 + (ball.y - 0.5) * 0.3;
+    }
+
+    // Move toward target with slight reaction delay
+    const speed = isSlowed ? 0.006 : 0.016;
+    const dy = targetY - rp.y;
+    if (Math.abs(dy) > speed) {
+      rp.y += dy > 0 ? speed : -speed;
+    } else {
+      rp.y = targetY;
+    }
+
+    // X movement: intercept ball or hold position
+    let targetX = 0.92;
+    if (ball.vx > 0 && ball.x > 0.5) {
+      // Move toward ball for interception
+      targetX = Math.min(RIGHT_X_MAX, ball.x + 0.06);
+    }
+    const dxPaddle = targetX - rp.x;
+    const xSpeed = isSlowed ? 0.003 : 0.008;
+    if (Math.abs(dxPaddle) > xSpeed) {
+      rp.x += dxPaddle > 0 ? xSpeed : -xSpeed;
+    } else {
+      rp.x = targetX;
+    }
+
+    rp.x = Math.max(RIGHT_X_MIN, Math.min(RIGHT_X_MAX, rp.x));
+    rp.y = Math.max(PADDLE_HEIGHT / 2, Math.min(1 - PADDLE_HEIGHT / 2, rp.y));
+
+    // AI shooting: shoot when has ammo and ball is on opponent's side
+    if (this.ammo.right > 0 && ball.x < 0.4) {
+      this.bullets.push({
+        x: rp.x,
+        y: rp.y,
+        vx: -BULLET_SPEED,
+        owner: "right",
+      });
+      this.ammo.right--;
+    }
+
+    // AI pickup collection: move toward pickup if active and nearby
+    if (this.pickup.active) {
+      const pdx = this.pickup.x - rp.x;
+      const pdy = this.pickup.y - rp.y;
+      if (Math.sqrt(pdx * pdx + pdy * pdy) < 0.2) {
+        // Adjust target to collect pickup
+        rp.y += (this.pickup.y - rp.y) * 0.05;
+      }
+    }
   }
 
   scheduleRestart() {
@@ -484,7 +565,8 @@ export class PongRoom extends DurableObject {
       this.ammo = { left: 0, right: 0 };
       this.pickup = { x: 0.5, y: 0.5, active: false };
       this.slowedUntil = { left: 0, right: 0 };
-      if (this.players.size === 2) {
+      const need = this.aiMode ? 1 : 2;
+      if (this.players.size >= need) {
         this.startGame();
       } else {
         this.stopGame();
@@ -553,6 +635,7 @@ export class PongRoom extends DurableObject {
 
     const url = new URL(request.url);
     const isLobby = url.searchParams.get("mode") === "lobby";
+    const isAI = url.searchParams.get("mode") === "ai";
 
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
@@ -562,9 +645,15 @@ export class PongRoom extends DurableObject {
 
     let role: "left" | "right" | "spectator";
     if (isLobby) {
-      // Lobby connections are always spectators — never take a player slot
       this.spectators.add(server);
       role = "spectator";
+    } else if (isAI) {
+      // AI mode: player is always left, AI controls right
+      this.aiMode = true;
+      this.players.set(server, "left");
+      role = "left";
+      // Set AI name
+      this.names.set(server, "");
     } else {
       role = this.assignRole(server);
     }
@@ -599,7 +688,8 @@ export class PongRoom extends DurableObject {
 
     this.broadcastPlayerCount();
 
-    if (this.players.size === 2 && !this.running && !this.winner) {
+    const needPlayers = this.aiMode ? 1 : 2;
+    if (this.players.size >= needPlayers && !this.running && !this.winner) {
       this.startGame();
     }
 
@@ -733,7 +823,10 @@ export default {
     }
 
     if (url.pathname === "/ws" || url.pathname === "/") {
-      const id = env.PONG_ROOM.idFromName("main");
+      const mode = url.searchParams.get("mode");
+      // AI mode gets its own room per session
+      const roomName = mode === "ai" ? `ai-${crypto.randomUUID()}` : "main";
+      const id = env.PONG_ROOM.idFromName(roomName);
       const room = env.PONG_ROOM.get(id);
       return room.fetch(request);
     }

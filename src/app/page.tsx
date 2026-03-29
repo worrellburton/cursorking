@@ -12,7 +12,7 @@ import WarGame from "@/components/WarGame";
 const WS_URL =
   process.env.NEXT_PUBLIC_WS_URL ?? "wss://cursorking-pong.worrellburton.workers.dev";
 
-type Screen = "name" | "howItWorks" | "start" | "game" | "warLobby" | "warGame";
+type Screen = "name" | "howItWorks" | "start" | "game" | "practiceAI" | "warLobby" | "warGame";
 type LobbyCursor = { x: number; y: number; name: string };
 
 export default function Home() {
@@ -439,6 +439,39 @@ export default function Home() {
               )}
 
               <button
+                onClick={() => {
+                  startMusicIfNeeded();
+                  if (lobbyWsRef.current) {
+                    lobbyWsRef.current.close();
+                    lobbyWsRef.current = null;
+                  }
+                  setScreen("practiceAI");
+                }}
+                style={{
+                  fontFamily: "Inter, sans-serif",
+                  fontSize: isMobile ? "0.7rem" : "0.8rem",
+                  fontWeight: "bold",
+                  color: "#ffaa00",
+                  border: "1.5px solid rgba(255, 170, 0, 0.5)",
+                  borderRadius: "9999px",
+                  padding: isMobile ? "8px 24px" : "10px 32px",
+                  background: "rgba(255, 170, 0, 0.06)",
+                  cursor: "pointer",
+                  letterSpacing: "0.15em",
+                  marginTop: 14,
+                  transition: "all 0.3s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(255, 170, 0, 0.15)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(255, 170, 0, 0.06)";
+                }}
+              >
+                PRACTICE VS AI
+              </button>
+
+              <button
                 onClick={() => setScreen("howItWorks")}
                 className="hiw-btn"
                 style={{
@@ -474,7 +507,7 @@ export default function Home() {
         </>
       )}
 
-      {screen === "game" && (
+      {(screen === "game" || screen === "practiceAI") && (
         <>
           <div
             className="fixed top-4 left-4 z-50"
@@ -490,7 +523,7 @@ export default function Home() {
               style={{ width: isMobile ? 100 : 140, height: "auto" }}
             />
           </div>
-          <PongGame playerName={playerName} isMobile={isMobile} />
+          <PongGame playerName={playerName} isMobile={isMobile} aiMode={screen === "practiceAI"} />
         </>
       )}
 
