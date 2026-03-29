@@ -80,6 +80,7 @@ export default function WarGame({
     winner: null,
   });
   const killFeedRef = useRef<KillEvent[]>([]);
+  const gameCountdownRef = useRef<number | null>(3); // starts at 3
   const myIdRef = useRef(myId);
   const wsRef = useRef(ws);
   const onExitRef = useRef(onExit);
@@ -144,6 +145,9 @@ export default function WarGame({
       }
       if (msg.type === "war-over") {
         stateRef.current.winner = msg.winner;
+      }
+      if (msg.type === "war-game-countdown") {
+        gameCountdownRef.current = msg.value > 0 ? msg.value : null;
       }
       // Server reset to lobby — exit the game
       if (msg.type === "war-lobby") {
@@ -440,6 +444,29 @@ export default function WarGame({
           ctx.fillStyle = TEAM_COLOR[k.victimTeam === "top" ? "bottom" : "top"];
           ctx.fillText(text, W - 16, 24 + i * 18);
         }
+        ctx.restore();
+      }
+
+      // 3-2-1 countdown overlay
+      const cd = gameCountdownRef.current;
+      if (cd !== null) {
+        ctx.save();
+        ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+        ctx.fillRect(0, 0, W, H);
+
+        const cdSize = Math.min(120, W * 0.12);
+        ctx.font = `bold ${cdSize}px 'Inter', sans-serif`;
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#22d3ee";
+        ctx.shadowColor = "#22d3ee";
+        ctx.shadowBlur = 30;
+        ctx.fillText(String(cd), W / 2, H / 2 + cdSize * 0.35);
+        ctx.shadowBlur = 0;
+
+        ctx.font = `600 ${Math.max(14, cdSize * 0.18)}px 'Inter', sans-serif`;
+        ctx.fillStyle = "rgba(255,255,255,0.5)";
+        ctx.letterSpacing = "4px";
+        ctx.fillText("GET READY", W / 2, H / 2 - cdSize * 0.6);
         ctx.restore();
       }
 

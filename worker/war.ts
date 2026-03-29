@@ -386,7 +386,20 @@ export class WarRoom extends DurableObject {
     }
 
     this.broadcast(JSON.stringify({ type: "war-start" }));
-    this.interval = setInterval(() => this.tick(), 1000 / TICK_RATE);
+
+    // 3-2-1-GO countdown before game begins
+    let cd = 3;
+    this.broadcast(JSON.stringify({ type: "war-game-countdown", value: cd }));
+    const cdTimer = setInterval(() => {
+      cd--;
+      if (cd > 0) {
+        this.broadcast(JSON.stringify({ type: "war-game-countdown", value: cd }));
+      } else {
+        clearInterval(cdTimer);
+        this.broadcast(JSON.stringify({ type: "war-game-countdown", value: 0 }));
+        this.interval = setInterval(() => this.tick(), 1000 / TICK_RATE);
+      }
+    }, 1000);
   }
 
   stopGame() {
