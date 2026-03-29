@@ -114,17 +114,16 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
 
   // Preload sound effects
   useEffect(() => {
-    const base = process.env.NODE_ENV === "production" ? "/cursorking" : "";
     const sounds: Record<string, string> = {
-      countdown3: `${base}/3.mp3`,
-      countdown2: `${base}/2.mp3`,
-      countdown1: `${base}/1.mp3`,
-      go: encodeURI(`${base}/GO!.mp3`),
-      roundStart: encodeURI(`${base}/ROUND START.mp3`),
-      nextRound: encodeURI(`${base}/Next Round.mp3`),
-      youWin: encodeURI(`${base}/YOU WIN.mp3`),
-      youLost: encodeURI(`${base}/You Lost.mp3`),
-      hit: `${base}/hit.mp3`,
+      countdown3: "/3.mp3",
+      countdown2: "/2.mp3",
+      countdown1: "/1.mp3",
+      go: encodeURI("/GO!.mp3"),
+      roundStart: encodeURI("/ROUND START.mp3"),
+      nextRound: encodeURI("/Next Round.mp3"),
+      youWin: encodeURI("/YOU WIN.mp3"),
+      youLost: encodeURI("/You Lost.mp3"),
+      hit: "/hit.mp3",
     };
     const loaded: Record<string, HTMLAudioElement> = {};
     for (const [key, src] of Object.entries(sounds)) {

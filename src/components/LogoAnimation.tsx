@@ -247,7 +247,7 @@ export default function LogoAnimation({
         }}
       >
         <img
-          src={`${isMobile ? "" : ""}${process.env.NODE_ENV === "production" ? "/cursorking" : ""}/logo.svg`}
+          src="/logo.svg"
           alt="CursorKing"
           style={{
             width: isMobile ? 280 : 500,

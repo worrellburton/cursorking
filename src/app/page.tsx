@@ -104,8 +104,7 @@ export default function Home() {
   // Start music on first interaction with the name input
   const startMusicIfNeeded = () => {
     if (audioRef.current) return;
-    const base = process.env.NODE_ENV === "production" ? "/cursorking" : "";
-    const audio = new Audio(`${base}/music.mp3`);
+    const audio = new Audio("/music.mp3");
     audio.volume = 0.5;
     audio.loop = true;
     audioRef.current = audio;
@@ -121,8 +120,7 @@ export default function Home() {
 
   const handleLogoAppear = useCallback(() => {
     startMusicIfNeeded();
-    const base = process.env.NODE_ENV === "production" ? "/cursorking" : "";
-    const cursorKingAudio = new Audio(encodeURI(`${base}/CURSOR KING.mp3`));
+    const cursorKingAudio = new Audio(encodeURI("/CURSOR KING.mp3"));
     cursorKingAudio.volume = 0.6;
     cursorKingAudio.play().catch(() => {});
   }, []);
@@ -487,7 +485,7 @@ export default function Home() {
             }}
           >
             <img
-              src={`${process.env.NODE_ENV === "production" ? "/cursorking" : ""}/logo.svg`}
+              src="/logo.svg"
               alt="CursorKing"
               style={{ width: isMobile ? 100 : 140, height: "auto" }}
             />
