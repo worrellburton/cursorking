@@ -680,8 +680,35 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         }
       }
 
+      // Helper: draw electric arcs on a slowed paddle
+      function drawElectric(c: CanvasRenderingContext2D, px: number, py: number, pw: number, ph: number) {
+        const seed = (nowMs * 0.01) | 0;
+        c.save();
+        c.strokeStyle = "#88ccff";
+        c.shadowColor = "#44aaff";
+        c.shadowBlur = 8;
+        c.lineWidth = 1.5;
+        for (let i = 0; i < 4; i++) {
+          const startX = px + (((seed * (i + 1) * 7) % 100) / 100) * pw;
+          const startY = py + (((seed * (i + 1) * 13) % 100) / 100) * ph;
+          c.beginPath();
+          c.moveTo(startX, startY);
+          let ex = startX, ey = startY;
+          for (let j = 0; j < 3; j++) {
+            ex += ((((seed + j * 17 + i * 31) % 20) - 10));
+            ey += ((((seed + j * 23 + i * 11) % 16) - 8));
+            ex = Math.max(px - 6, Math.min(px + pw + 6, ex));
+            ey = Math.max(py - 6, Math.min(py + ph + 6, ey));
+            c.lineTo(ex, ey);
+          }
+          c.stroke();
+        }
+        c.restore();
+      }
+
       // Left paddle — own paddle is white, opponent is team color
-      const leftPaddleColor = state.slowed?.left ? "#ff4444" : role === "left" ? "#ffffff" : "#22d3ee";
+      const leftSlowed = !!state.slowed?.left;
+      const leftPaddleColor = leftSlowed ? "#6688ff" : role === "left" ? "#ffffff" : "#22d3ee";
       const lx = paddleLeftX - paddleW / 2;
       const ly = paddleLeftY - paddleH / 2;
       ctx.globalAlpha = 0.25;
@@ -694,9 +721,13 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
       ctx.beginPath();
       ctx.roundRect(lx, ly, paddleW, paddleH, 4);
       ctx.fill();
+      if (leftSlowed) {
+        drawElectric(ctx, lx, ly, paddleW, paddleH);
+      }
 
       // Right paddle
-      const rightPaddleColor = state.slowed?.right ? "#ff4444" : role === "right" ? "#ffffff" : "#f43f5e";
+      const rightSlowed = !!state.slowed?.right;
+      const rightPaddleColor = rightSlowed ? "#6688ff" : role === "right" ? "#ffffff" : "#f43f5e";
       const rx = paddleRightX - paddleW / 2;
       const ry = paddleRightY - paddleH / 2;
       ctx.globalAlpha = 0.25;
@@ -709,6 +740,9 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
       ctx.beginPath();
       ctx.roundRect(rx, ry, paddleW, paddleH, 4);
       ctx.fill();
+      if (rightSlowed) {
+        drawElectric(ctx, rx, ry, paddleW, paddleH);
+      }
 
       // Compute ball speed for glow scaling
       const prev = prevBallRef.current;
@@ -749,31 +783,57 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
       ctx.arc(ballX, ballY, ballR, 0, Math.PI * 2);
       ctx.fill();
 
-      // Bullets — big yellow projectiles
+      // Bullets — lightning bolt projectiles
       if (state.bullets) {
         for (const b of state.bullets) {
           toScreen(b.x, b.y);
           const bx = _ts.x;
           const by = _ts.y;
+          const dir = b.owner === "left" ? 1 : -1;
+          const angle = mob ? (role === "left" ? -Math.PI / 2 : Math.PI / 2) : 0;
 
-          // Outer glow
-          ctx.globalAlpha = 0.25;
+          ctx.save();
+          ctx.translate(bx, by);
+          ctx.rotate(angle);
+          ctx.scale(dir, 1);
+
+          // Glow behind bolt
+          ctx.globalAlpha = 0.3;
+          ctx.shadowColor = "#ffdd33";
+          ctx.shadowBlur = 14;
           ctx.fillStyle = "#ffdd33";
           ctx.beginPath();
-          ctx.arc(bx, by, 18, 0, Math.PI * 2);
+          ctx.arc(0, 0, 14, 0, Math.PI * 2);
           ctx.fill();
-          // Inner glow
-          ctx.globalAlpha = 0.5;
-          ctx.fillStyle = "#ffee66";
-          ctx.beginPath();
-          ctx.arc(bx, by, 12, 0, Math.PI * 2);
-          ctx.fill();
-          // Core
+          ctx.shadowBlur = 0;
+
+          // Lightning bolt shape
           ctx.globalAlpha = 1;
-          ctx.fillStyle = "#ffffff";
+          ctx.fillStyle = "#ffee44";
           ctx.beginPath();
-          ctx.arc(bx, by, 6, 0, Math.PI * 2);
+          ctx.moveTo(-10, -3);
+          ctx.lineTo(-2, -3);
+          ctx.lineTo(-4, -9);
+          ctx.lineTo(10, 1);
+          ctx.lineTo(2, 1);
+          ctx.lineTo(4, 7);
+          ctx.closePath();
           ctx.fill();
+
+          // White core highlight
+          ctx.fillStyle = "#ffffff";
+          ctx.globalAlpha = 0.7;
+          ctx.beginPath();
+          ctx.moveTo(-6, -1.5);
+          ctx.lineTo(-1, -1.5);
+          ctx.lineTo(-2, -5);
+          ctx.lineTo(6, 0.5);
+          ctx.lineTo(1, 0.5);
+          ctx.lineTo(2, 4);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.restore();
         }
       }
 
