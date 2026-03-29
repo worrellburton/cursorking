@@ -7,6 +7,7 @@ const BALL_SIZE_MIN = 0.006;
 const BALL_SPEED = 0.007;
 const BALL_ACCEL = 1.06;
 const BALL_TICK_ACCEL = 1.0004;
+const BALL_MAX_SPEED = 0.035; // cap to prevent tunneling through paddles
 const WIN_SCORE = 3;
 const RESTART_DELAY = 3000;
 
@@ -213,6 +214,14 @@ export class PongRoom extends DurableObject {
     ball.vx *= BALL_TICK_ACCEL;
     ball.vy *= BALL_TICK_ACCEL;
 
+    // Cap max speed to prevent tunneling through paddles
+    const spd = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+    if (spd > BALL_MAX_SPEED) {
+      const scale = BALL_MAX_SPEED / spd;
+      ball.vx *= scale;
+      ball.vy *= scale;
+    }
+
     ball.x += ball.vx;
     ball.y += ball.vy;
 
@@ -257,7 +266,7 @@ export class PongRoom extends DurableObject {
       if (crossY >= lpTop && crossY <= lpBottom) {
         const hitPos = (crossY - lp.y) / (PADDLE_HEIGHT / 2);
         const angle = hitPos * (Math.PI / 4);
-        const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * BALL_ACCEL;
+        const speed = Math.min(BALL_MAX_SPEED, Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * BALL_ACCEL);
         ball.x = lpRight + BALL_SIZE;
         ball.y = crossY;
         ball.vx = Math.abs(speed * Math.cos(angle));
@@ -272,7 +281,7 @@ export class PongRoom extends DurableObject {
       if (crossY >= lpTop && crossY <= lpBottom) {
         const hitPos = (crossY - lp.y) / (PADDLE_HEIGHT / 2);
         const angle = hitPos * (Math.PI / 4);
-        const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * BALL_ACCEL;
+        const speed = Math.min(BALL_MAX_SPEED, Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * BALL_ACCEL);
         ball.x = lpLeft - BALL_SIZE;
         ball.y = crossY;
         ball.vx = -Math.abs(speed * Math.cos(angle));
@@ -287,7 +296,7 @@ export class PongRoom extends DurableObject {
     ) {
       const hitPos = (ball.y - lp.y) / (PADDLE_HEIGHT / 2);
       const angle = hitPos * (Math.PI / 4);
-      const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * BALL_ACCEL;
+      const speed = Math.min(BALL_MAX_SPEED, Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * BALL_ACCEL);
       if (ball.x < lp.x) {
         ball.x = lpLeft - BALL_SIZE;
         ball.vx = -Math.abs(speed * Math.cos(angle));
@@ -313,7 +322,7 @@ export class PongRoom extends DurableObject {
       if (crossY >= rpTop && crossY <= rpBottom) {
         const hitPos = (crossY - rp.y) / (PADDLE_HEIGHT / 2);
         const angle = hitPos * (Math.PI / 4);
-        const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * BALL_ACCEL;
+        const speed = Math.min(BALL_MAX_SPEED, Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * BALL_ACCEL);
         ball.x = rpLeft - BALL_SIZE;
         ball.y = crossY;
         ball.vx = -Math.abs(speed * Math.cos(angle));
@@ -328,7 +337,7 @@ export class PongRoom extends DurableObject {
       if (crossY >= rpTop && crossY <= rpBottom) {
         const hitPos = (crossY - rp.y) / (PADDLE_HEIGHT / 2);
         const angle = hitPos * (Math.PI / 4);
-        const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * BALL_ACCEL;
+        const speed = Math.min(BALL_MAX_SPEED, Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * BALL_ACCEL);
         ball.x = rpRight + BALL_SIZE;
         ball.y = crossY;
         ball.vx = Math.abs(speed * Math.cos(angle));
@@ -343,7 +352,7 @@ export class PongRoom extends DurableObject {
     ) {
       const hitPos = (ball.y - rp.y) / (PADDLE_HEIGHT / 2);
       const angle = hitPos * (Math.PI / 4);
-      const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * BALL_ACCEL;
+      const speed = Math.min(BALL_MAX_SPEED, Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * BALL_ACCEL);
       if (ball.x > rp.x) {
         ball.x = rpRight + BALL_SIZE;
         ball.vx = Math.abs(speed * Math.cos(angle));
