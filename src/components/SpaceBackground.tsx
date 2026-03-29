@@ -149,7 +149,9 @@ export default function SpaceBackground() {
         ss.life++;
 
         if (ss.life > ss.maxLife) {
-          shootingStars.splice(i, 1);
+          shootingStars[i] = shootingStars[shootingStars.length - 1];
+          shootingStars.pop();
+          i--;
           continue;
         }
 

@@ -445,6 +445,10 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
 
     let animId: number;
 
+    // Reusable temp objects to avoid allocations in draw loop
+    const _ts = { x: 0, y: 0 }; // toScreen result
+    const _ss = { x: 0, y: 0 }; // serverToScreen result
+
     function draw() {
       if (!ctx || !canvas) return;
       const state = gameStateRef.current;
@@ -456,36 +460,42 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
       const H = canvas.height;
       const mob = isMobile;
 
-      // Helper: transform server normalized coords to screen pixels
-      // On mobile, always rotate (default to "left" for spectators)
+      // Helper: transform server normalized coords to screen pixels (mutates _ts, no allocation)
       const mobRole = mob ? (role === "left" || role === "right" ? role : "left") : null;
       function toScreen(sx: number, sy: number): { x: number; y: number } {
         if (mobRole) {
-          const s = serverToScreen(sx, sy, mobRole);
-          return { x: s.x * W, y: s.y * H };
+          if (mobRole === "left") { _ss.x = sy; _ss.y = 1 - sx; }
+          else { _ss.x = 1 - sy; _ss.y = sx; }
+          _ts.x = _ss.x * W; _ts.y = _ss.y * H;
+        } else {
+          _ts.x = sx * W; _ts.y = sy * H;
         }
-        return { x: sx * W, y: sy * H };
+        return _ts;
       }
 
-      // Extrapolate ball — predict position using velocity, never freeze
+      // Single timestamp for entire frame
       const now = performance.now();
+      const nowMs = Date.now();
+
+      // Extrapolate ball — predict position using velocity, never freeze
       const elapsed = now - serverBallTimeRef.current;
       if (!state.winner) {
         const vel = ballVelRef.current;
         let bx = serverBallRef.current.x + vel.x * elapsed;
         let by = serverBallRef.current.y + vel.y * elapsed;
-        // Client-side wall bounce during extrapolation
         if (by < 0) { by = -by; }
         if (by > 1) { by = 2 - by; }
-        // Clamp to prevent wild extrapolation
-        bx = Math.max(-0.05, Math.min(1.05, bx));
-        interpBallRef.current = { x: bx, y: by };
+        bx = bx < -0.05 ? -0.05 : bx > 1.05 ? 1.05 : bx;
+        interpBallRef.current.x = bx;
+        interpBallRef.current.y = by;
       }
 
-      const activeBall = state.winner ? state.ball : interpBallRef.current;
-      const ballScreen = toScreen(activeBall.x, activeBall.y);
-      const ballX = ballScreen.x;
-      const ballY = ballScreen.y;
+      const ib = interpBallRef.current;
+      const activeBallX = state.winner ? state.ball.x : ib.x;
+      const activeBallY = state.winner ? state.ball.y : ib.y;
+      toScreen(activeBallX, activeBallY);
+      const ballX = _ts.x;
+      const ballY = _ts.y;
 
       // Smooth opponent paddle — lerp toward server position each frame
       const oppSide: "left" | "right" = (myRoleRef.current === "left") ? "right" : "left";
@@ -498,16 +508,14 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
       sm.right.y += (sp.right.y - sm.right.y) * lerpFactor;
 
       // Use smoothed positions for opponent, raw for own paddle
-      const displayPaddles = {
-        left: myRoleRef.current === "left" ? state.paddles.left : sm.left,
-        right: myRoleRef.current === "right" ? state.paddles.right : sm.right,
-      };
-      const lpScreen = toScreen(displayPaddles.left.x, displayPaddles.left.y);
-      const rpScreen = toScreen(displayPaddles.right.x, displayPaddles.right.y);
-      const paddleLeftX = lpScreen.x;
-      const paddleLeftY = lpScreen.y;
-      const paddleRightX = rpScreen.x;
-      const paddleRightY = rpScreen.y;
+      const dpLeft = myRoleRef.current === "left" ? state.paddles.left : sm.left;
+      const dpRight = myRoleRef.current === "right" ? state.paddles.right : sm.right;
+      toScreen(dpLeft.x, dpLeft.y);
+      const paddleLeftX = _ts.x;
+      const paddleLeftY = _ts.y;
+      toScreen(dpRight.x, dpRight.y);
+      const paddleRightX = _ts.x;
+      const paddleRightY = _ts.y;
 
       // On mobile, paddles are horizontal bars (swap W/H dims)
       let paddleH: number, paddleW: number;
@@ -529,7 +537,7 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
       ctx.clearRect(0, 0, W, H);
 
       // Slowed screen flash
-      const hitAge = Date.now() - bulletHitFlashRef.current;
+      const hitAge = nowMs - bulletHitFlashRef.current;
       if (hitAge < 500) {
         const flashAlpha = 0.15 * (1 - hitAge / 500);
         ctx.fillStyle = `rgba(255, 0, 0, ${flashAlpha})`;
@@ -691,15 +699,16 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
       const dy = ballY - prev.y;
       const frameSpeed = Math.sqrt(dx * dx + dy * dy);
       ballSpeedRef.current = ballSpeedRef.current * 0.9 + frameSpeed * 0.1;
-      prevBallRef.current = { x: ballX, y: ballY };
+      prevBallRef.current.x = ballX;
+      prevBallRef.current.y = ballY;
 
       const speedFactor = Math.min(3, 1 + ballSpeedRef.current / 8);
 
-      // Ball trail — simple circles, no gradients
+      // Ball trail — simple circles, no gradients, O(1) removal
       const trail = ballTrailRef.current;
       trail.push({ x: ballX, y: ballY, age: 0 });
-      const maxTrail = Math.floor(8 + speedFactor * 10);
-      while (trail.length > maxTrail) trail.shift();
+      const maxTrail = 8 + (speedFactor * 10) | 0;
+      if (trail.length > maxTrail) trail.splice(0, trail.length - maxTrail);
 
       const trailLife = 12 + speedFactor * 12;
       for (let i = 0; i < trail.length; i++) {
@@ -726,9 +735,9 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
       // Bullets — big yellow projectiles
       if (state.bullets) {
         for (const b of state.bullets) {
-          const bs = toScreen(b.x, b.y);
-          const bx = bs.x;
-          const by = bs.y;
+          toScreen(b.x, b.y);
+          const bx = _ts.x;
+          const by = _ts.y;
 
           // Outer glow
           ctx.globalAlpha = 0.25;
@@ -753,10 +762,10 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
 
       // Bullet pickup — simplified, no gradients or shadowBlur
       if (state.pickup?.active) {
-        const ps = toScreen(state.pickup.x, state.pickup.y);
-        const px = ps.x;
-        const py = ps.y;
-        const pulse = 0.7 + 0.3 * Math.sin(Date.now() / 300);
+        toScreen(state.pickup.x, state.pickup.y);
+        const px = _ts.x;
+        const py = _ts.y;
+        const pulse = 0.7 + 0.3 * Math.sin(nowMs / 300);
 
         // Outer pulse ring
         ctx.strokeStyle = `rgba(255, 220, 50, ${pulse * 0.4})`;
@@ -817,7 +826,7 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         ctx.font = `bold ${slowSize}px 'Inter', sans-serif`;
         ctx.textAlign = "center";
         ctx.fillStyle = "#ff4444";
-        const blink = Math.sin(Date.now() / 150) > 0 ? 1 : 0.3;
+        const blink = Math.sin(nowMs / 150) > 0 ? 1 : 0.3;
         ctx.globalAlpha = blink;
         ctx.fillText("SLOWED!", W / 2, mob ? H * 0.85 : H * 0.12);
         ctx.globalAlpha = 1;
@@ -880,14 +889,15 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
 
       // Opponent cursor — draw at their smoothed paddle position
       if (!mob && (role === "left" || role === "right")) {
-        const oppPaddle = displayPaddles[oppSide];
-        const oppScreen = toScreen(oppPaddle.x, oppPaddle.y);
+        const oppPaddle = oppSide === "left" ? dpLeft : dpRight;
+        toScreen(oppPaddle.x, oppPaddle.y);
+        const oppScreenX = _ts.x, oppScreenY = _ts.y;
         const oppCursorColor = oppSide === "left" ? "#22d3ee" : "#f43f5e";
         const oppName = oppSide === "left" ? state.names.left : state.names.right;
 
         ctx.save();
         ctx.globalAlpha = 0.5;
-        ctx.translate(oppScreen.x, oppScreen.y);
+        ctx.translate(oppScreenX, oppScreenY);
         ctx.beginPath();
         ctx.moveTo(0, 0);
         ctx.lineTo(0, 18);
@@ -915,10 +925,10 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
 
       // Waiting for player message
       if (count < 2 && !state.winner && role !== "spectator") {
-        const t = Date.now() / 400;
+        const t = nowMs / 400;
         const pulse = 0.6 + 0.4 * Math.sin(t);
 
-        const dotCount = Math.floor((Date.now() / 500) % 4);
+        const dotCount = Math.floor((nowMs / 500) % 4);
         const dots = ".".repeat(dotCount);
         const text = `WAITING FOR PLAYER${dots}`;
 
