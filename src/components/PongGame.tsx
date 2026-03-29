@@ -558,12 +558,12 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Center circle (like a hockey rink faceoff circle)
+      // Center circle (like a hockey rink faceoff circle) — solid line, no dash
       const centerR = Math.min(W, H) * 0.08;
       ctx.strokeStyle = "rgba(255,255,255,0.06)";
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.arc(mob ? W / 2 : W / 2, H / 2, centerR, 0, Math.PI * 2);
+      ctx.arc(W / 2, H / 2, centerR, 0, Math.PI * 2);
       ctx.stroke();
       // Small dot at center
       ctx.fillStyle = "rgba(255,255,255,0.08)";
@@ -619,20 +619,29 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         ctx.fillText(String(oppScore), W / 2, H * 0.15);
         ctx.fillText(String(myScore), W / 2, H * 0.9);
 
-        const nameSize = Math.max(12, Math.floor(W * 0.03));
-        ctx.font = `bold ${nameSize}px 'Inter', sans-serif`;
+        const nameSize = Math.max(12, Math.floor(W * 0.032));
+        ctx.font = `600 ${nameSize}px 'Inter', sans-serif`;
+        ctx.letterSpacing = "2px";
         if (oppName) {
-          ctx.fillStyle = `${oppColor}99`;
+          ctx.save();
+          ctx.shadowColor = oppColor;
+          ctx.shadowBlur = 12;
+          ctx.fillStyle = oppColor;
           ctx.fillText(oppName.toUpperCase(), W / 2, H * 0.04);
+          ctx.restore();
           if (oppLoc) {
             drawLocationTag(ctx, W / 2, H * 0.04 + nameSize + 4, oppLoc, `${oppColor}66`, Math.max(8, nameSize - 4));
           }
         }
-        ctx.font = `bold ${nameSize}px 'Inter', sans-serif`;
+        ctx.font = `600 ${nameSize}px 'Inter', sans-serif`;
         ctx.textAlign = "center";
         if (myName) {
-          ctx.fillStyle = `${myColor}99`;
+          ctx.save();
+          ctx.shadowColor = myColor;
+          ctx.shadowBlur = 12;
+          ctx.fillStyle = myColor;
           ctx.fillText(myName.toUpperCase(), W / 2, H * 0.97);
+          ctx.restore();
         }
       } else {
         // Desktop: left score on left, right score on right
@@ -642,19 +651,28 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         ctx.fillText(String(state.score.right), (W * 3) / 4, H * 0.18);
 
         const nameSize = Math.max(14, Math.floor(H * 0.025));
-        ctx.font = `bold ${nameSize}px 'Inter', sans-serif`;
+        ctx.font = `600 ${nameSize}px 'Inter', sans-serif`;
+        ctx.letterSpacing = "3px";
         if (state.names.left) {
-          ctx.fillStyle = "rgba(34, 211, 238, 0.6)";
+          ctx.save();
+          ctx.shadowColor = "#22d3ee";
+          ctx.shadowBlur = 16;
+          ctx.fillStyle = "rgba(34, 211, 238, 0.85)";
           ctx.fillText(state.names.left.toUpperCase(), W / 4, H * 0.05);
+          ctx.restore();
           if (state.locations?.left) {
             const locSize = Math.max(10, Math.floor(H * 0.016));
             drawLocationTag(ctx, W / 4, H * 0.05 + nameSize * 0.6, state.locations.left, "rgba(34, 211, 238, 0.4)", locSize);
           }
         }
         if (state.names.right) {
-          ctx.font = `bold ${nameSize}px 'Inter', sans-serif`;
-          ctx.fillStyle = "rgba(244, 63, 94, 0.6)";
+          ctx.font = `600 ${nameSize}px 'Inter', sans-serif`;
+          ctx.save();
+          ctx.shadowColor = "#f43f5e";
+          ctx.shadowBlur = 16;
+          ctx.fillStyle = "rgba(244, 63, 94, 0.85)";
           ctx.fillText(state.names.right.toUpperCase(), (W * 3) / 4, H * 0.05);
+          ctx.restore();
           if (state.locations?.right) {
             const locSize = Math.max(10, Math.floor(H * 0.016));
             drawLocationTag(ctx, (W * 3) / 4, H * 0.05 + nameSize * 0.6, state.locations.right, "rgba(244, 63, 94, 0.4)", locSize);
@@ -877,9 +895,12 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
         const myName = role === "left" ? state.names.left : role === "right" ? state.names.right : "";
         if (myName) {
           const labelSize = Math.max(11, Math.floor(H * 0.018));
-          ctx.font = `bold ${labelSize}px 'Inter', sans-serif`;
+          ctx.font = `600 ${labelSize}px 'Inter', sans-serif`;
+          ctx.letterSpacing = "1.5px";
           ctx.textAlign = "left";
           const nameColor = role === "left" ? "#22d3ee" : "#f43f5e";
+          ctx.shadowColor = nameColor;
+          ctx.shadowBlur = 10;
           ctx.fillStyle = nameColor;
           ctx.fillText(myName.toUpperCase(), 18, 28);
         }
@@ -914,8 +935,11 @@ export default function PongGame({ playerName, isMobile = false }: { playerName:
 
         if (oppName) {
           const labelSize = Math.max(10, Math.floor(H * 0.015));
-          ctx.font = `bold ${labelSize}px 'Inter', sans-serif`;
+          ctx.font = `600 ${labelSize}px 'Inter', sans-serif`;
+          ctx.letterSpacing = "1.5px";
           ctx.textAlign = "left";
+          ctx.shadowColor = oppCursorColor;
+          ctx.shadowBlur = 8;
           ctx.fillStyle = oppCursorColor;
           ctx.fillText(oppName.toUpperCase(), 16, 24);
         }
