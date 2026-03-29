@@ -357,6 +357,44 @@ export default function WarLobby({
         )}
       </div>
 
+      {/* TEST button — fill with AI */}
+      {selectedRole && !countdown && (
+        <button
+          onClick={() => {
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              wsRef.current.send(JSON.stringify({ type: "fill-ai" }));
+            }
+          }}
+          style={{
+            position: "fixed",
+            bottom: 24,
+            right: 24,
+            fontFamily: "Inter, sans-serif",
+            fontSize: 12,
+            fontWeight: "bold",
+            color: "#ffaa00",
+            background: "rgba(255, 170, 0, 0.1)",
+            border: "1px solid rgba(255, 170, 0, 0.3)",
+            borderRadius: 8,
+            padding: "8px 20px",
+            cursor: "pointer",
+            letterSpacing: "0.15em",
+            zIndex: 30,
+            transition: "all 0.2s",
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = "rgba(255, 170, 0, 0.2)";
+            e.currentTarget.style.borderColor = "rgba(255, 170, 0, 0.5)";
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = "rgba(255, 170, 0, 0.1)";
+            e.currentTarget.style.borderColor = "rgba(255, 170, 0, 0.3)";
+          }}
+        >
+          TEST WITH AI
+        </button>
+      )}
+
       {/* Selected role card */}
       {selectedRole && (
         <div

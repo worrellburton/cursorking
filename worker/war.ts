@@ -214,6 +214,101 @@ export class WarRoom extends DurableObject {
     }
   }
 
+  aiIds = new Set<string>();
+
+  fillWithAI(requesterId: string) {
+    // Ensure the requester has a slot
+    const hasSlot = this.slots.some(s => s.playerId === requesterId);
+    if (!hasSlot) return;
+
+    // Fill empty slots with AI
+    const aiNames = ["NOVA", "BLITZ", "CIPHER", "VORTEX", "GHOST", "PULSE", "SPARK", "RAZOR", "ECHO"];
+    let nameIdx = 0;
+    for (const s of this.slots) {
+      if (s.playerId === null) {
+        const aiId = "ai_" + Math.random().toString(36).slice(2, 8);
+        s.playerId = aiId;
+        s.playerName = aiNames[nameIdx % aiNames.length];
+        this.aiIds.add(aiId);
+        nameIdx++;
+      }
+    }
+    this.broadcastLobby();
+
+    // All slots filled, start countdown
+    if (this.slots.every(s => s.playerId !== null)) {
+      this.startCountdown();
+    }
+  }
+
+  tickAI() {
+    const now = Date.now();
+    for (const p of this.players.values()) {
+      if (!p.alive || !this.aiIds.has(p.id)) continue;
+
+      // Find nearest enemy
+      let nearestEnemy: Player | null = null;
+      let nearestDist = Infinity;
+      for (const e of this.players.values()) {
+        if (!e.alive || e.team === p.team) continue;
+        const dx = e.x - p.x;
+        const dy = e.y - p.y;
+        const d = dx * dx + dy * dy;
+        if (d < nearestDist) { nearestDist = d; nearestEnemy = e; }
+      }
+
+      if (!nearestEnemy) continue;
+
+      if (p.role === "healer") {
+        // Healer: stay near king, heal allies
+        const ally = this.findClosestAlly(p);
+        if (ally) {
+          p.targetX = ally.x + (Math.random() - 0.5) * 0.05;
+          p.targetY = ally.y + (Math.random() - 0.5) * 0.05;
+          if (ally.hp < MAX_HP[ally.role]) {
+            p.mouseDown = true;
+          } else {
+            p.mouseDown = false;
+            // Empower if off cooldown
+            if (now >= p.empowerCdEnd) p.rightDown = true;
+          }
+        }
+      } else if (p.role === "orb") {
+        // Orb: move between king and enemies
+        const king = [...this.players.values()].find(a => a.team === p.team && a.role === "king" && a.alive);
+        if (king && nearestEnemy) {
+          p.targetX = (king.x + nearestEnemy.x) / 2;
+          p.targetY = (king.y + nearestEnemy.y) / 2;
+        }
+      } else {
+        // Combat roles: move toward enemy and shoot
+        p.targetX = nearestEnemy.x + (Math.random() - 0.5) * 0.1;
+        p.targetY = nearestEnemy.y + (Math.random() - 0.5) * 0.1;
+
+        // Keep some distance
+        const dist = Math.sqrt(nearestDist);
+        if (dist < 0.15) {
+          p.targetX = p.x - (nearestEnemy.x - p.x) * 0.3;
+          p.targetY = p.y - (nearestEnemy.y - p.y) * 0.3;
+        }
+
+        p.mouseDown = dist < 0.5;
+
+        // Sniper: release to fire after charging
+        if (p.role === "sniper" && p.charging) {
+          const chargeTime = now - p.chargeStart;
+          if (chargeTime > 800 + Math.random() * 1500) {
+            p.mouseDown = false;
+          }
+        }
+      }
+
+      // Clamp targets
+      p.targetX = Math.max(0.05, Math.min(0.95, p.targetX));
+      p.targetY = Math.max(0.05, Math.min(0.95, p.targetY));
+    }
+  }
+
   startCountdown() {
     if (this.phase === "countdown") return; // already counting
     this.phase = "countdown";
@@ -309,6 +404,9 @@ export class WarRoom extends DurableObject {
   tick() {
     if (this.phase !== "playing") return;
     const now = Date.now();
+
+    // 0. AI decisions
+    this.tickAI();
 
     // 1. Move players
     for (const p of this.players.values()) {
@@ -722,6 +820,11 @@ export class WarRoom extends DurableObject {
 
     if (data.type === "select-slot" && this.phase === "lobby") {
       this.selectSlot(senderId, data.team, data.role);
+      return;
+    }
+
+    if (data.type === "fill-ai" && (this.phase === "lobby" || this.phase === "countdown")) {
+      this.fillWithAI(senderId);
       return;
     }
 
