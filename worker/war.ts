@@ -15,13 +15,13 @@ const COUNTDOWN_SECS = 5;
 
 // Movement: units per tick (normalized 0–1 coords)
 const MOVE_SPEED: Record<Role, number> = {
-  king: 0.004,
-  sniper: 0.004,
+  king: 0.003,
+  sniper: 0.003,
   orb: 0, // uses lerp instead
-  healer: 0.004,
-  gunner: 0.006,
+  healer: 0.003,
+  gunner: 0.0045,
 };
-const ORB_LERP = 0.03;
+const ORB_LERP = 0.02;
 
 const MAX_HP: Record<Role, number> = {
   king: 100,
@@ -41,9 +41,9 @@ const PLAYER_RADIUS: Record<Role, number> = {
 
 // Bullet config
 const BULLET_SPEED: Record<string, number> = {
-  king: 0.008,
-  sniper: 0.012,
-  gunner: 0.015,
+  king: 0.006,
+  sniper: 0.009,
+  gunner: 0.011,
 };
 const BULLET_RADIUS = 0.005;
 const SNIPER_MAX_BOUNCES = 5;
@@ -61,16 +61,24 @@ const DMG_GUNNER = 10;
 // Cooldowns (ms)
 const KING_SHOT_CD = 5000;
 const SNIPER_CHARGE_TIME = 3000;
-const GUNNER_FIRE_RATE = 100; // ms between shots
-const GUNNER_EMPOWERED_RATE = 50;
+const GUNNER_FIRE_RATE = 140; // ms between shots
+const GUNNER_EMPOWERED_RATE = 70;
 const HEAL_PER_TICK = 20 / TICK_RATE; // 20 hp/sec
 const EMPOWER_DURATION = 5000;
 const EMPOWER_COOLDOWN = 10000;
 const ORB_EMPOWER_GROWTH = 0.015;
 
-// Spawn positions
-const SPAWN_X = [0.15, 0.3, 0.5, 0.7, 0.85];
-const SPAWN_Y: Record<Team, number> = { top: 0.15, bottom: 0.85 };
+// Spawn positions — bottom team in lower-left, top team in upper-right
+const SPAWN_POSITIONS: Record<Team, { x: number[]; y: number[] }> = {
+  bottom: {
+    x: [0.08, 0.15, 0.12, 0.20, 0.06],
+    y: [0.80, 0.85, 0.90, 0.88, 0.84],
+  },
+  top: {
+    x: [0.92, 0.85, 0.88, 0.80, 0.94],
+    y: [0.20, 0.15, 0.10, 0.12, 0.16],
+  },
+};
 
 // ==================== STATE TYPES ====================
 
@@ -351,17 +359,18 @@ export class WarRoom extends DurableObject {
     for (const slot of this.slots) {
       if (!slot.playerId) continue;
       const spawnIdx = roleIndex[slot.role];
+      const sp = SPAWN_POSITIONS[slot.team];
       const p: Player = {
         id: slot.playerId,
         name: slot.playerName,
         team: slot.team,
         role: slot.role,
-        x: SPAWN_X[spawnIdx],
-        y: SPAWN_Y[slot.team],
+        x: sp.x[spawnIdx],
+        y: sp.y[spawnIdx],
         hp: MAX_HP[slot.role],
         alive: true,
-        targetX: SPAWN_X[spawnIdx],
-        targetY: SPAWN_Y[slot.team],
+        targetX: sp.x[spawnIdx],
+        targetY: sp.y[spawnIdx],
         mouseDown: false,
         rightDown: false,
         lastShot: 0,
