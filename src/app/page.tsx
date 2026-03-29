@@ -395,7 +395,7 @@ export default function Home() {
                     display: "inline-block",
                   }}
                 />
-                {lobbyPlayerCount > 0 ? `${lobbyPlayerCount} ONLINE` : lobbyPlayerCount === 0 ? "LIVE" : "CONNECTING..."}
+                {lobbyPlayerCount > 0 ? `${lobbyPlayerCount} GLOBAL PLAYERS` : lobbyPlayerCount === 0 ? "LIVE" : "CONNECTING..."}
               </div>
 
               {/* 5v5 WAR button — desktop only */}
